@@ -1,0 +1,476 @@
+import hashlib
+import json
+import multiprocessing as mp
+from enum import Enum
+from pathlib import Path
+from typing import Tuple
+
+import keras
+import numpy as np
+import pandas as pd
+from PIL import Image
+from tqdm import tqdm
+
+from .constants import (
+    CXR_LABELS,
+    FITZPATRICK_LABELS_COARSE,
+    FITZPATRICK_LABELS_FINE,
+    CXRLabelStrategy,
+)
+
+
+class BaseDataset:
+    """
+    Basic Interface common to all datasets. This class is not meant to be used directly but to be subclassed by specific datasets.
+    To use this class, you need to implement the __getinput___(), __gettarget___(),  and __len__() methods in the subclass.
+
+    Args:
+
+        df (pd.DataFrame): The dataframe containing the dataset
+        img_path (Path): The path to the images
+        name (str): The name of the dataset
+        num_classes (int): The number of classes in the dataset
+        img_channels (int): The number of channels in the images
+        img_size (int): The size of the images
+        split (str): The split of the dataset (train, val, test)
+        save_root (Path): The path to save the dataset
+        n_threads (int): The number of threads to use for loading the dataset
+        memmap (bool): Whether to use memmap for loading the dataset
+
+
+    """
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,
+        name: str,
+        num_classes: int,
+        img_channels: int,
+        img_size: int,
+        split: str,
+        save_root: Path,
+        n_threads: int = 32,
+        memmap: bool = False,
+    ):
+        print(f"... Creating {name} dataset")
+        super().__init__()
+        self.dataframe = df
+        self.img_path = img_path
+        self.name = name
+        self.num_classes = num_classes
+        self.save_root = Path(save_root) / name
+        self.split = split
+        self.img_channels = img_channels
+        self.img_size = img_size
+        self.filename = f"{name}_{split}_{self.img_size}x{self.img_size}"
+        self.n_threads = n_threads
+        self.save_root.mkdir(parents=True, exist_ok=True)
+        self.memmap = memmap
+        if not isinstance(self.img_path, Path):
+            self.img_path = Path(self.img_path)
+        if not self.img_path.exists():
+            print(f"Warning: Image path {self.img_path} does not exist")
+
+    def __getinput__(self, index: int):
+        """Returns input corresponding to index i in the dataset"""
+        pass
+
+    def __gettarget__(self, index: int):
+        """Returns target corresponding to index i in the dataset"""
+        pass
+
+    def __getitem__(self, index: int) -> tuple:
+        inp = self.__getinput__(index)
+        target = self.__gettarget__(index)
+        return inp, target
+
+    def _load_from_scratch(self):
+        """
+        Load the dataset into memory by iterating through it.
+        """
+        success = False
+        convenience_fn_exists = callable(getattr(self, '__get_all_targets__', None))
+        if not self.memmap:
+            with mp.Pool(self.n_threads) as pool:
+                inputs = list(
+                    tqdm(
+                        pool.imap(
+                            self.__getinput__, range(self.__len__()), chunksize=32
+                        ),
+                        desc="Loading inputs",
+                        total=self.__len__(),
+                    )
+                )
+                if not convenience_fn_exists:
+                    targets = list(
+                        tqdm(
+                            pool.imap(
+                                self.__gettarget__, range(self.__len__()), chunksize=32
+                            ),
+                            desc="Loading targets",
+                            total=self.__len__(),
+                        )
+                    )
+                    self.targets = np.array(targets, dtype=np.float32)
+                else:
+                    self.targets = self.__get_all_targets__()
+                self.inputs = np.array(inputs, dtype=np.float32)
+            success = True
+        else:
+            print("... creating memmap files")
+            self.inputs = np.memmap(
+                f"{self.save_root}/{self.filename}_inputs.mmp",
+                dtype=np.float32,
+                mode="w+",
+                shape=(self.__len__(), self.img_size, self.img_size, self.img_channels),
+            )
+            self.targets = np.memmap(
+                f"{self.save_root}/{self.filename}_targets.mmp",
+                dtype=np.float32,
+                mode="w+",
+                shape=(self.__len__(), self.num_classes),
+            )
+            if convenience_fn_exists:
+                targets = self.__get_all_targets__()
+            for i in tqdm(range(self.__len__()), desc="Loading data"):
+                self.inputs[i] = self.__getinput__(i)
+                self.targets[i] = self.__gettarget__(i) if not convenience_fn_exists else targets[i]
+                self.inputs.flush()
+                self.targets.flush()
+            success = True
+
+        return success
+
+    def __len__(self):
+        """Returns the length of the dataset"""
+        pass
+
+    def _write_metadata(self):
+        if self.inputs is None or self.targets is None:
+            raise ValueError(
+                "Cannot save dataset to disk, inputs and targets are None. Load the dataset first."
+            )
+        base_file_name = self.save_root / f"{self.filename}"
+        df_hash = hashlib.sha1(
+            pd.util.hash_pandas_object(self.dataframe).values
+        ).hexdigest()
+        # Write metadata JSON file
+        metadata = {
+            "input_shape": self.inputs.shape,
+            "target_shape": self.targets.shape,
+            "df_hash": df_hash,
+        }
+        metadata_file = f"{base_file_name}.json"
+        with open(metadata_file, "w") as file:
+            json.dump(metadata, file)
+
+    def _write_arrays_to_disk(self) -> None:
+        """Write a loaded dataset to disk (saves two .npz files and a metadata file)."""
+        self._write_metadata()
+        base_file_name = self.save_root / f"{self.filename}"
+        if not self.memmap:
+            # write npz files for input and target arrays
+            np.save(f"{base_file_name}_inputs", self.inputs)
+            np.save(f"{base_file_name}_targets", self.targets)
+
+    def _load_from_file(self) -> bool:
+        """Loads dataset from disk (.npz files and the metadata file)."""
+        success = False
+        base_file_name = self.save_root / f"{self.filename}"
+        metadata_file = Path(f"{base_file_name}.json")
+        file_end = ".npy" if not self.memmap else ".mmp"
+        input_file = Path(f"{base_file_name}_inputs{file_end}")
+        target_file = Path(f"{base_file_name}_targets{file_end}")
+        print(f"... looking for dataset at: {self.save_root}")
+        print(f"... checking metadata file: {metadata_file}")
+        if input_file.exists() and target_file.exists() and metadata_file.is_file():
+            # read metadata file
+            with open(metadata_file, "r") as file:
+                metadata = json.load(file)
+                input_shape = tuple(metadata["input_shape"])
+                target_shape = tuple(metadata["target_shape"])
+            # Read .npz files
+            if not self.memmap:
+                self.inputs = np.load(input_file)
+                self.targets = np.load(target_file)
+            else:
+                self.inputs = np.memmap(
+                    input_file, dtype=np.float32, mode="r", shape=input_shape
+                )
+                self.targets = np.memmap(
+                    target_file, dtype=np.float32, mode="r", shape=target_shape
+                )
+            assert (
+                input_shape == self.inputs.shape
+            ), f"Input shape mismatch: {input_shape} vs. {self.inputs.shape}"
+            assert (
+                target_shape == self.targets.shape
+            ), f"Target shape mismatch: {target_shape} vs. {self.targets.shape}"
+            # check if dataframe has changed since the npz files were created
+            current_df_hash = hashlib.sha1(
+                pd.util.hash_pandas_object(self.dataframe).values
+            ).hexdigest()
+            if metadata["df_hash"] != current_df_hash:
+                raise ValueError(
+                    f"Careful, hash mismatch! Underlying dataframe has changed since npz files were created: {metadata['df_hash']} vs. {current_df_hash}"
+                )
+            success = True
+            print("... succesfully loaded dataset from disk")
+        return success
+
+    def get_numpy(
+        self, load_from_disk: bool = True, overwrite_existing: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Return the input and target arrays."""
+        if load_from_disk:
+            success = self._load_from_file()
+            if not success:
+                print("... loading dataset from disk failed, loading from scratch")
+                success = self._load_from_scratch()
+        else:
+            success = self._load_from_scratch()
+        if overwrite_existing and success:
+            self._write_arrays_to_disk()
+            print("... sucessfully wrote dataset to disk")
+        assert success, "loading dataset failed"
+        return self.inputs, self.targets
+
+
+class CXRDataset(BaseDataset):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,
+        name: str,
+        img_size: int,
+        split: str,
+        save_root: Path,
+        memmap: bool = False,
+        label_strategy: CXRLabelStrategy = CXRLabelStrategy.UNCERTAIN_ONES,
+        frontal_only=False,
+    ):
+
+        self.label_strategy = label_strategy
+        if frontal_only:
+            if "Frontal/Lateral" in df:
+                df = df[df["Frontal/Lateral"] == "Frontal"]
+            elif "ViewPosition" in df:
+                df = df[df.ViewPosition.isin(["AP", "PA"])]
+            else:
+                raise ValueError(
+                    f"Dataframe does not have a 'Frontal/Lateral' or 'ViewPosition' column. Availabel are: {df.columns}"
+                )
+        super().__init__(
+            df=df,
+            img_path=img_path,
+            name=name,
+            num_classes=14,
+            img_channels=1,
+            img_size=img_size,
+            split=split,
+            save_root=save_root,
+            memmap=memmap,
+        )
+        self.dataframe = self.dataframe.fillna(0)
+        if "Path" in self.dataframe.columns:
+            self.dataframe.rename(columns={"Path": "path"}, inplace=True)
+        assert "path" in self.dataframe.columns, "Dataframe must have a 'path' column"
+
+    def __getinput__(self, index: int):
+        """Returns input corresponding to index i in the dataset"""
+
+        path_str = self.dataframe["path"].iloc[index]
+        img_path = self.img_path / path_str
+        assert img_path.exists(), f"Image path {img_path} does not exist"
+        # load in image
+        img = Image.open(img_path).resize((self.img_size, self.img_size))
+        img = np.array(img, dtype=np.float32)
+        img = img / 127.5 - 1
+        img = np.expand_dims(img, axis=-1)
+        assert img.shape == (
+            self.img_size,
+            self.img_size,
+            1,
+        ), f"Image shape {img.shape} is not ({self.img_size}, {self.img_size}, 1)"
+        return img
+
+    def __gettarget__(self, index: int):
+        """Returns target corresponding to index i in the dataset"""
+        target = self.dataframe.iloc[index][CXR_LABELS]
+        target = np.array(target, dtype=np.float16)
+        if self.label_strategy == CXRLabelStrategy.UNCERTAIN_ONES:
+            target[target == -1.0] = 1.0
+        else:
+            target[target == -1.0] = 0.0
+        return target
+
+    def __get_all_targets__(self):
+        """Returns all targets in the dataset"""
+        targets = self.dataframe[CXR_LABELS]
+        targets = np.array(targets, dtype=np.float16)
+        if self.label_strategy == CXRLabelStrategy.UNCERTAIN_ONES:
+            targets[targets == -1.0] = 1.0
+        else:
+            targets[targets == -1.0] = 0.0
+        return targets
+
+    def __len__(self) -> int:
+        """Returns the length of the dataset"""
+        return len(self.dataframe)
+
+
+class FitzPatLabelSetting(Enum):
+    COARSE = 0
+    FINE = 1
+
+
+class FitzpatrickDataset(BaseDataset):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,
+        name: str,
+        img_size: int,
+        split: str,
+        save_root: Path,
+        label_setting: FitzPatLabelSetting = FitzPatLabelSetting.FINE,
+    ):
+
+        self.label_setting = label_setting
+        num_classes = 3 if label_setting == FitzPatLabelSetting.COARSE else 9
+
+        super().__init__(
+            df=df,
+            img_path=img_path,
+            name=name,
+            num_classes=num_classes,
+            img_channels=3,
+            img_size=img_size,
+            split=split,
+            save_root=save_root,
+        )
+
+    def __getinput__(self, index: int):
+        img_path = self.img_path / f"{self.dataframe.iloc[index]['md5hash']}.jpg"
+        img = Image.open(img_path)
+        img = img.resize((self.img_size, self.img_size))
+        img = np.array(img, dtype=np.float32)
+        img = img / 127.5 - 1
+        return img
+
+    def __gettarget__(self, index: int):
+        if self.label_setting == FitzPatLabelSetting.COARSE:
+            target = np.array(
+                FITZPATRICK_LABELS_COARSE.index(
+                    self.dataframe.iloc[index]["three_partition_label"]
+                )
+            )
+        elif self.label_setting == FitzPatLabelSetting.FINE:
+            target = np.array(
+                FITZPATRICK_LABELS_FINE.index(
+                    self.dataframe.iloc[index]["nine_partition_label"]
+                )
+            )
+        n_classes = 3 if self.label_setting == FitzPatLabelSetting.COARSE else 9
+        target = keras.utils.to_categorical(target, num_classes=n_classes)
+        return target
+
+    def __len__(self) -> int:
+        return len(self.dataframe)
+
+
+class EMBEDataset(BaseDataset):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,
+        name: str,
+        img_size: int,
+        split: str,
+        save_root: Path,
+        memmap: bool = False,
+    ):
+        super().__init__(
+            df=df,
+            img_path=img_path,
+            name=name,
+            num_classes=4,
+            img_channels=1,
+            img_size=img_size,
+            split=split,
+            save_root=save_root,
+            memmap=memmap,
+        )
+
+    def __getinput__(self, index: int):
+        file_name = (
+            self.dataframe.iloc[index]["anon_dicom_path"].split("/")[-1][:-4] + ".png"
+        )
+        if not self.dataframe.iloc[index]["preprocessed_img_exists"]:
+            raise ValueError(f"Preprocessed image does not exist for {file_name}")
+        img_path = self.img_path / file_name
+        img = Image.open(img_path)
+        img = img.resize((self.img_size, self.img_size))
+        img = np.array(img, dtype=np.float32)
+        img = img / 127.5 - 1
+        return img[..., None]
+
+    def __get_all_targets__(self):
+        """Returns all targets in the dataset"""
+        targets = self.dataframe["BIRADS_DENSITY"]
+        targets = np.array(targets, dtype=np.float16)
+        targets = keras.utils.to_categorical(targets, num_classes=self.num_classes)
+        return targets
+
+    def __gettarget__(self, index: int):
+        target = self.dataframe.iloc[index]["BIRADS_DENSITY"]
+        target = np.array(target, dtype=np.float16)
+        target = keras.utils.to_categorical(target, num_classes=self.num_classes)
+        return target
+
+    def __len__(self) -> int:
+        return len(self.dataframe)
+
+
+class FairVisionDataset(BaseDataset):
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,
+        name: str,
+        img_size: int,
+        split: str,
+        save_root: Path,
+    ):
+
+        super().__init__(
+            df=df,
+            img_path=img_path,
+            name=name,
+            num_classes=7,
+            img_channels=1,
+            img_size=img_size,
+            split=split,
+            save_root=save_root,
+        )
+
+    def __getinput__(self, index: int):
+        file_name = self.dataframe.iloc[index]["slo_file_path"]
+        img_path = self.img_path / file_name
+        img = Image.open(img_path)
+        img = img.resize((self.img_size, self.img_size))
+        img = np.array(img, dtype=np.float32)
+        img = img / 127.5 - 1
+        img = np.expand_dims(img[..., 0], axis=-1)
+        return img
+
+    def __gettarget__(self, index: int):
+        target = self.dataframe.iloc[index]["disease_label"]
+        target = np.array(target, dtype=np.float16)
+        target = keras.utils.to_categorical(target, num_classes=self.num_classes)
+        return target
+
+    def __len__(self) -> int:
+        return len(self.dataframe)
