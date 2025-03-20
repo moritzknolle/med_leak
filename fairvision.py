@@ -10,7 +10,6 @@ import numpy as np
 from absl import app, flags
 
 from src.data_utils.dataset_factory import get_dataset
-from src.train_utils.metrics import LabelType
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
 from src.train_utils.utils import (LabelType, MyCosineDecay, get_aug_fn,
