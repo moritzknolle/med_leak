@@ -20,6 +20,10 @@ from src.privacy_utils.rmia import perform_rmia, rmia_transform_multiclass
 from src.privacy_utils.utils import confidence_roc_plot
 from src.train_utils.utils import get_label_mode
 
+# force jax to use CPU
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 FONT_SIZE = 7
 plt.style.use("default")
 plt.rcParams.update(
