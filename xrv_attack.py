@@ -5,12 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from absl import app, flags
 from sklearn.metrics import roc_auc_score, roc_curve
-from plots import get_color
 
-from src.privacy_utils.lira import (
-    compute_scores,
-    load_score,
-)
+from plots import get_color
+from src.privacy_utils.lira import compute_scores, load_score
 from src.privacy_utils.rmia import perform_rmia, rmia_transform_multiclass
 from src.train_utils.utils import get_label_mode
 
@@ -25,8 +22,8 @@ plt.rcParams.update(
         "axes.grid": False,
         "grid.alpha": 0.1,
         "axes.axisbelow": True,
-        #"figure.constrained_layout.use": True,
-        #"pdf.fonttype":42,
+        # "figure.constrained_layout.use": True,
+        # "pdf.fonttype":42,
     }
 )
 color_a = "#3b3f3f"
@@ -60,10 +57,18 @@ flags.DEFINE_integer("threads", 8, "Number of threads.")
 
 def main(argv):
     rmia_transform_func = partial(rmia_transform_multiclass, is_mimic_or_chexpert=True)
-    rmia_load_func = partial(load_score, logit_transform_func=rmia_transform_func, verbose=True)
-    assert Path(FLAGS.reference_model_logdir).is_dir(), f"{FLAGS.reference_model_logdir} is not a directory."
-    assert Path(FLAGS.chex_model_logdir).is_dir(), f"{FLAGS.chex_model_logdir} is not a directory."
-    assert Path(FLAGS.mimic_model_logdir).is_dir(), f"{FLAGS.mimic_model_logdir} is not a directory." 
+    rmia_load_func = partial(
+        load_score, logit_transform_func=rmia_transform_func, verbose=True
+    )
+    assert Path(
+        FLAGS.reference_model_logdir
+    ).is_dir(), f"{FLAGS.reference_model_logdir} is not a directory."
+    assert Path(
+        FLAGS.chex_model_logdir
+    ).is_dir(), f"{FLAGS.chex_model_logdir} is not a directory."
+    assert Path(
+        FLAGS.mimic_model_logdir
+    ).is_dir(), f"{FLAGS.mimic_model_logdir} is not a directory."
     reference_scores, reference_mask, _ = compute_scores(
         log_dirs=[Path(FLAGS.reference_model_logdir)],
         load_score_func=rmia_load_func,
@@ -92,7 +97,12 @@ def main(argv):
         "reference mask:",
         reference_mask.shape,
     )
-    print("chexpert scores:", chexpert_model_scores.shape, "target mask:", chexpert_mask.shape)
+    print(
+        "chexpert scores:",
+        chexpert_model_scores.shape,
+        "target mask:",
+        chexpert_mask.shape,
+    )
     print("mimic scores:", mimic_model_scores.shape, "target mask:", mimic_mask.shape)
     label_mode = get_label_mode("multiclass")
     rmia_preds_chex, rmia_targets_chex = perform_rmia(
@@ -134,8 +144,18 @@ def main(argv):
     auc_chex = roc_auc_score(rmia_targets_chex, rmia_preds_chex)
     fpr_mimic, tpr_mimic, _ = roc_curve(rmia_targets_mimic, rmia_preds_mimic)
     auc_mimic = roc_auc_score(rmia_targets_mimic, rmia_preds_mimic)
-    ax.plot(fpr_chex, tpr_chex, label=f"CheXpert ({auc_chex:.2f})", color=get_color("chexpert"))
-    ax.plot(fpr_mimic, tpr_mimic, label=f"MIMIC-CXR ({auc_mimic:.2f})", color=get_color("mimic"))
+    ax.plot(
+        fpr_chex,
+        tpr_chex,
+        label=f"CheXpert ({auc_chex:.2f})",
+        color=get_color("chexpert"),
+    )
+    ax.plot(
+        fpr_mimic,
+        tpr_mimic,
+        label=f"MIMIC-CXR ({auc_mimic:.2f})",
+        color=get_color("mimic"),
+    )
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", label="Random")
     ax.spines[["right", "top"]].set_visible(False)
     lin_ticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
@@ -143,7 +163,7 @@ def main(argv):
     ax.set_ylabel("True Positive Rate")
     ax.set_xticks(lin_ticks)
     ax.set_yticks(lin_ticks)
-    ax.legend(loc="lower right") # bbox_to_anchor=(0.3, 1.22)
+    ax.legend(loc="lower right")  # bbox_to_anchor=(0.3, 1.22)
     outdir = Path(FLAGS.out_dir)
     outdir.mkdir(parents=True, exist_ok=True)
     plt.savefig(outdir / "roc_curve.pdf", bbox_inches="tight")

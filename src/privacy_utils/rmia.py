@@ -143,10 +143,8 @@ def perform_rmia(
         assert (
             test_scores.shape[0] == test_masks.shape[0]
         ), f"Shapes do not match: {test_scores.shape} vs {test_masks.shape}"
-    print(f"train scores shape: {train_scores.shape}")
     train_scores = np.mean(train_scores, axis=-1)
     test_scores = np.mean(test_scores, axis=-1)
-    print(f"train scores shape: {train_scores.shape}")
 
     dat_in, dat_out = [], []
     for j in range(train_scores.shape[1]):
@@ -156,7 +154,6 @@ def perform_rmia(
 
     in_size = min([d.shape[0] for d in dat_in])
     out_size = min([d.shape[0] for d in dat_out])
-    print(f"min_in_size: {in_size}, min_out_size: {out_size}")
 
     # truncate to the minimum size to make array
     dat_in = np.stack([x[:in_size] for x in dat_in], axis=1)
@@ -208,6 +205,7 @@ def perform_rmia(
     pred_func = partial(
         get_preds_rmia, pr_x=pr_x, pr_z=pr_z, indices=indices, gamma=gamma
     )
+    print(f"... Computing predictions for N={len(test_scores)} Target Models")
     if multi_processing:
         with multiprocessing.Pool(processes=threads) as pool:
             mia_preds = list(
@@ -224,6 +222,7 @@ def perform_rmia(
                 test_scores, desc="Computing RMIA attack", total=len(test_scores)
             )
         ]
+    print("---------------------------------------------------------------------------")
     mia_preds = np.array(mia_preds)
     mia_targets = np.array(test_masks)
     return mia_preds, mia_targets

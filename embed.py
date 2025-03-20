@@ -13,7 +13,7 @@ from src.train_utils.metrics import LabelType
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
 from src.train_utils.utils import (LabelType, MyCosineDecay, get_aug_fn,
-                                         grayscale_to_rgb)
+                                   grayscale_to_rgb)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 30, "Number of training steps.")
@@ -100,7 +100,9 @@ def main(argv):
         overwrite_existing=True,
         one_image_per_patient=FLAGS.one_image_per_patient,
     )
-    imagenet_weights = FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"  
+    imagenet_weights = (
+        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+    )
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:
         STEPS = int(STEPS * FLAGS.subset_ratio)

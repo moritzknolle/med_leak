@@ -8,14 +8,13 @@ import numpy as np
 import scipy
 from absl import app, flags
 
+from mem_inf_stats import get_patient_col
 from src.data_utils.dataset_factory import get_dataset
 from src.privacy_utils.common import aggregate_by_patient
 from src.privacy_utils.lira import (compute_scores, load_score,
-                                          loss_logit_transform_multiclass,
-                                          loss_logit_transform_multilabel,
-                                          perform_lira,
-                                          record_MIA_ROC_analysis)
-from mem_inf_stats import get_patient_col
+                                    loss_logit_transform_multiclass,
+                                    loss_logit_transform_multilabel,
+                                    perform_lira, record_MIA_ROC_analysis)
 
 FONT_SIZE = 7
 plt.style.use("default")
@@ -30,13 +29,15 @@ plt.rcParams.update(
         "grid.alpha": 0.1,
         "axes.axisbelow": True,
         "figure.constrained_layout.use": True,
-        #"pdf.fonttype": 42, # embed fonts in pdf
+        # "pdf.fonttype": 42, # embed fonts in pdf
     }
 )
 FLAGS = flags.FLAGS
 flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset.")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
-flags.DEFINE_float("ylim_upper", 0.925, "upper y-limit for test performance metric plot")
+flags.DEFINE_float(
+    "ylim_upper", 0.925, "upper y-limit for test performance metric plot"
+)
 flags.DEFINE_float("ylim_lower", 0.8, "lower y-limit for test performance metric plot")
 
 FITZ_LOG_DIRS = {
@@ -55,7 +56,7 @@ CHEX_LOGDIRS = {
     "CNN": "./logs/chexpert/small_cnn",
     "WRN_28_2": "./logs/chexpert/wrn_28_2",
     "WRN_28_5": "./logs/chexpert/wrn_28_5",
-    #"VIT-B/16": "./logs/chexpert/vit_b_16_64x64",
+    # "VIT-B/16": "./logs/chexpert/vit_b_16_64x64",
     "VIT-B/16": "./logs/chexpert/vit_b_16_128x128",
 }
 CHEX_COLORS = {
@@ -106,7 +107,9 @@ def main(argv):
     )
     COLORS = CHEX_COLORS if FLAGS.dataset_name == "chexpert" else FITZ_COLORS
     LOG_DIRS = CHEX_LOGDIRS if FLAGS.dataset_name == "chexpert" else FITZ_LOG_DIRS
-    test_metric_name = "_val_macro_auroc(cxp)" if FLAGS.dataset_name == "chexpert" else "_val_auroc"
+    test_metric_name = (
+        "_val_macro_auroc(cxp)" if FLAGS.dataset_name == "chexpert" else "_val_auroc"
+    )
     is_mimic_or_chexpert = FLAGS.dataset_name in ["mimic-cxr", "chexpert"]
     logit_transform_func = partial(
         loss_logit_transform_multiclass, is_mimic_or_chexpert=is_mimic_or_chexpert
@@ -119,9 +122,7 @@ def main(argv):
     for model_name, base_dir in LOG_DIRS.items():
         base_dir = Path(base_dir)
         logdirs = [d for d in base_dir.iterdir()]
-        test_metric_vals = get_perf_from_json(
-            base_dir, metric_name=test_metric_name
-        )
+        test_metric_vals = get_perf_from_json(base_dir, metric_name=test_metric_name)
         test_metric_means.append(np.mean(test_metric_vals))
         test_metric_stds.append(np.std(test_metric_vals))
         print(
@@ -141,7 +142,11 @@ def main(argv):
             aucs = patient_auc_df["max"]
         res = scipy.stats.ecdf(aucs)
         conf = res.sf.confidence_interval(confidence_level=0.95)
-        res.sf.plot(ax=axes[0], color=COLORS[model_name], label=f"{model_name}({np.mean(aucs):.2f})")
+        res.sf.plot(
+            ax=axes[0],
+            color=COLORS[model_name],
+            label=f"{model_name}({np.mean(aucs):.2f})",
+        )
         conf.low.plot(
             ax=axes[0], color=COLORS[model_name], linestyle="--", lw=1, alpha=0.8
         )
@@ -165,8 +170,8 @@ def main(argv):
     axes[0].set_xlim((0.475, 1.01))
     ylim = 1 / len(aucs)
     axes[0].set_ylim((ylim, 1))
-    axes[0].spines[['right', 'top']].set_visible(False)
-    axes[1].spines[['right', 'top']].set_visible(False)
+    axes[0].spines[["right", "top"]].set_visible(False)
+    axes[1].spines[["right", "top"]].set_visible(False)
     xlabel = (
         "MIA AUC (Patient-level)"
         if FLAGS.dataset_name == "chexpert"

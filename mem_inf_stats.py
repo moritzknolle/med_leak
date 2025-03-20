@@ -5,19 +5,18 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 from absl import app, flags
-from sklearn.metrics import roc_auc_score, roc_curve
-from tqdm import tqdm
+from sklearn.metrics import roc_auc_score
 
 from src.data_utils.dataset_factory import get_dataset
 from src.data_utils.utils import get_dataset_str
-from src.privacy_utils.lira import (compute_scores,
-                                          loss_logit_transform_multiclass,
-                                          perform_lira,
-                                          record_MIA_ROC_analysis)
 from src.privacy_utils.common import load_score
-from src.privacy_utils.plot_utils import mia_auc_esf_plot, subgroup_plots, disease_group_plots, plot_images
-from src.privacy_utils.rmia import (perform_rmia,
-                                          rmia_transform_multiclass)
+from src.privacy_utils.lira import (compute_scores,
+                                    loss_logit_transform_multiclass,
+                                    perform_lira, record_MIA_ROC_analysis)
+from src.privacy_utils.plot_utils import (disease_group_plots,
+                                          mia_auc_esf_plot, plot_images,
+                                          subgroup_plots)
+from src.privacy_utils.rmia import perform_rmia, rmia_transform_multiclass
 from src.privacy_utils.utils import confidence_roc_plot
 from src.train_utils.utils import get_label_mode
 
@@ -85,7 +84,7 @@ flags.DEFINE_bool(
 )
 flags.DEFINE_float(
     "offline_a",
-    1.0,
+    0.9,
     "Offline approximation parameter a used for RMIA. See original paper for details.",
 )
 flags.DEFINE_bool(
@@ -130,24 +129,26 @@ def get_patient_col(dataset_name: str):
         raise ValueError(f"Unknown dataset: {dataset_name}")
     return patient_col
 
+
 def get_data_root(dataset_name: str):
     if dataset_name == "chexpert":
-        data_root=Path("/home/moritz/data/chexpert")
+        data_root = Path("/home/moritz/data/chexpert")
     elif dataset_name == "mimic":
-        data_root=Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg")
+        data_root = Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg")
     elif dataset_name == "fairvision":
-        data_root=Path("/home/moritz/data_big/fairvision/FairVision")
+        data_root = Path("/home/moritz/data_big/fairvision/FairVision")
     elif dataset_name == "embed":
-        data_root=Path("/home/moritz/data_huge/embed_small/processed_512x512")
+        data_root = Path("/home/moritz/data_huge/embed_small/processed_512x512")
     elif dataset_name == "fitzpatrick":
-        data_root=Path("/home/moritz/data/fitzpatrick17k")
+        data_root = Path("/home/moritz/data/fitzpatrick17k")
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
     return data_root
 
+
 def main(argv):
     np.random.seed(FLAGS.seed)
-    print("... loading MIA results for dataset", FLAGS.dataset, "from", FLAGS.logdir)
+    print("... computing MIA results for dataset", FLAGS.dataset, "from", FLAGS.logdir)
     train_dataset, _ = get_dataset(
         dataset_name=FLAGS.dataset,
         img_size=FLAGS.img_size,
@@ -189,7 +190,6 @@ def main(argv):
             multi_processing=FLAGS.multiprocessing,
             threads=FLAGS.threads,
         )
-        print("RMIA shapes:", rmia_scores.shape, rmia_masks.shape)
         assert np.allclose(masks, rmia_masks), "Careful, masks do not match."
     assert scores.shape[1] == len(
         train_dataset
@@ -200,6 +200,7 @@ def main(argv):
     print(
         f"scores: shape={scores.shape} mean={scores.mean():.3f} max={scores.max():.3f} min={scores.min():.3f}, masks: shape={masks.shape}"
     )
+    print("---------------------------------------------------------------------------")
     # patient-level analytic (record-level) ROC anaylsis using all scores
     _, _, record_aucs, record_aucs_se = record_MIA_ROC_analysis(
         scores=scores, masks=masks, resolution=10_000, log_scale=False
@@ -225,9 +226,21 @@ def main(argv):
     )
     if FLAGS.plot_images:
         # plot most vulnerable records
-        plot_images(risk_scores=record_aucs, dataset=train_dataset, dataset_name=FLAGS.dataset, out_dir=out_dir, highest=True)
-        plot_images(risk_scores=record_aucs, dataset=train_dataset, dataset_name=FLAGS.dataset, out_dir=out_dir, highest=False)
-
+        plot_images(
+            risk_scores=record_aucs,
+            dataset=train_dataset,
+            dataset_name=FLAGS.dataset,
+            out_dir=out_dir,
+            highest=True,
+        )
+        plot_images(
+            risk_scores=record_aucs,
+            dataset=train_dataset,
+            dataset_name=FLAGS.dataset,
+            out_dir=out_dir,
+            highest=False,
+        )
+    print("---------------------------------------------------------------------------")
     if not FLAGS.patient_level_only:
         train_scores, test_scores = (
             scores[: -FLAGS.eval_size],
@@ -346,13 +359,8 @@ def main(argv):
     # sub-group analysis
     df = train_dataset.dataframe.copy()
     df["MIA_AUC"] = record_aucs
-    print(len(df), df.head())
-    print(type(df))
     subgroup_plots(dataset_name=FLAGS.dataset, results_df=df, out_path=out_dir)
-    print(df.head())
-    print(df.columns)
     disease_group_plots(dataset_name=FLAGS.dataset, results_df=df, out_path=out_dir)
-
 
 
 if __name__ == "__main__":

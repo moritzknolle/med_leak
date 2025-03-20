@@ -106,7 +106,9 @@ def main(argv):
         overwrite_existing=False,
         one_image_per_patient=FLAGS.one_image_per_patient,
     )
-    imagenet_weights = FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"  
+    imagenet_weights = (
+        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+    )
 
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:

@@ -95,7 +95,7 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-    
+
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:
         STEPS = int(STEPS * FLAGS.subset_ratio)
@@ -134,13 +134,13 @@ def main(argv):
             ],
         )
         return model
-    
-    def get_callbacks(is_ema:bool):
+
+    def get_callbacks(is_ema: bool):
         callbacks = []
         if is_ema:
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
         return callbacks
-    
+
     if FLAGS.eval_only:
         if not FLAGS.full_train_dataset:
             model = get_compiled_model()

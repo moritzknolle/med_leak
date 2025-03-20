@@ -13,7 +13,8 @@ from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.metrics import LabelType
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
-from src.train_utils.utils import LabelType, MyCosineDecay, get_aug_fn, grayscale_to_rgb
+from src.train_utils.utils import (LabelType, MyCosineDecay, get_aug_fn,
+                                   grayscale_to_rgb)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
@@ -40,7 +41,11 @@ flags.DEFINE_enum(
     "What type of data augmentations strength to apply.",
 )
 flags.DEFINE_integer("img_size", 64, "Image size.")
-flags.DEFINE_boolean("mixed_precision", True, "Whether to perform mixed precision training to reduce training time.")
+flags.DEFINE_boolean(
+    "mixed_precision",
+    True,
+    "Whether to perform mixed precision training to reduce training time.",
+)
 flags.DEFINE_boolean(
     "full_train_dataset",
     False,
@@ -84,7 +89,9 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-    imagenet_weights = FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"  
+    imagenet_weights = (
+        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+    )
 
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:
@@ -120,12 +127,12 @@ def main(argv):
             loss=keras.losses.CategoricalCrossentropy(from_logits=True),
             metrics=[
                 keras.metrics.CategoricalAccuracy(),
-                keras.metrics.AUC(from_logits=True)
-                ],
+                keras.metrics.AUC(from_logits=True),
+            ],
         )
         return model
-    
-    def get_callbacks(is_ema:bool):
+
+    def get_callbacks(is_ema: bool):
         callbacks = []
         if is_ema:
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]

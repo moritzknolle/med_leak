@@ -65,7 +65,6 @@ def compute_scores(
                 ), "Found label mismatch. Labels are assumed to stay constant between runs. Check for Errors ..."
     logit_score_arr = np.stack(logit_scores, axis=0)
     masks_arr = np.stack(masks, axis=0)
-    print(f"logit_scores shape: {logit_score_arr.shape} and masks: {masks_arr.shape}")
     return logit_score_arr, masks_arr, labels
 
 
@@ -259,7 +258,6 @@ def perform_lira(
         )
 
     dat_in, dat_out = [], []
-    print("TRAIN SCORES SHAPE:", train_scores.shape)
     for j in range(train_scores.shape[1]):
         data_point_mask = train_masks[:, j]
         dat_in.append(train_scores[data_point_mask, j])
@@ -267,7 +265,6 @@ def perform_lira(
 
     in_size = min([d.shape[0] for d in dat_in])
     out_size = min([d.shape[0] for d in dat_out])
-    print(f"min_in_size: {in_size}, min_out_size: {out_size}")
 
     # truncate to the minimum size to make array
     dat_in = np.stack([x[:in_size] for x in dat_in], axis=1)
@@ -275,7 +272,6 @@ def perform_lira(
     assert (
         dat_in.shape[1] == dat_out.shape[1]
     ), f"Shapes do not match: {dat_in.shape} vs {dat_out.shape}"
-    print(f"in_scores shape: {dat_in.shape} and out_scores: {dat_out.shape}")
 
     mean_in = np.median(dat_in, 0)
     mean_out = np.median(dat_out, 0)
@@ -289,7 +285,7 @@ def perform_lira(
     pred_func = partial(
         get_preds_univariate, other_args=[mean_in, mean_out, std_in, std_out]
     )
-    print(f"... Computing predictions for N={len(test_scores)}  Target Models")
+    print(f"... Computing predictions for N={len(test_scores)} Target Models")
     if multi_processing:
         with multiprocessing.Pool(processes=threads) as pool:
             mia_preds = list(
@@ -306,7 +302,7 @@ def perform_lira(
                 test_scores, desc="Computing LiRA attack", total=len(test_scores)
             )
         ]
-
+    print("---------------------------------------------------------------------------")
     mia_preds = np.array(mia_preds)
     mia_targets = np.array(test_masks)
     mia_preds = -mia_preds
@@ -393,12 +389,10 @@ def record_MIA_ROC_analysis(
 
     in_size = min([d.shape[0] for d in dat_in])
     out_size = min([d.shape[0] for d in dat_out])
-    print(f"min_in_size: {in_size}, min_out_size: {out_size}")
 
     # truncate to the minimum size to make array
     in_scores = np.stack([x[:in_size] for x in dat_in], axis=1)
     out_scores = np.stack([x[:out_size] for x in dat_out], axis=1)
-    print(f"in_scores shape: {in_scores.shape} and out_scores: {out_scores.shape}")
 
     # compute ROC curves analytically
     mean_in = np.mean(in_scores, axis=0)
@@ -412,17 +406,13 @@ def record_MIA_ROC_analysis(
         std_in = np.mean(std_in, axis=1)
         std_out = np.mean(std_out, axis=1)
     print(
-        f"using N_in={in_scores.shape[0]} and N_out={out_scores.shape[0]} samples to estimate normal distributions"
-    )
-    print(
-        f"mean_in: {mean_in.shape}, mean_out: {mean_out.shape}, std_in: {std_in.shape}, std_out: {std_out.shape}"
+        f"... using N_in={in_scores.shape[0]} and N_out={out_scores.shape[0]} samples to estimate record-level sampling distributions"
     )
     std_in += eps  # add small epsilon to avoid division by zero
     a = (mean_in - mean_out) / std_in
     b = std_out / std_in
     a = a[None, :]
     b = b[None, :]
-    print(f"a: {a.shape}, b: {b.shape}")
     if log_scale:
         fprs = np.logspace(-5, 0, resolution)[:, None]
     else:
@@ -448,7 +438,7 @@ def record_MIA_ROC_analysis(
         (aucs * (1 - aucs) + (in_scores.shape[0] - 1) * (q_0 - aucs**2) + (out_scores.shape[0] - 1) * (q_1 - aucs**2))
         / (in_scores.shape[0] * out_scores.shape[0])
     )
-    print(f"SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
+    print(f"Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
     assert (
         np.count_nonzero(np.isnan(aucs)) == 0
     ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}"

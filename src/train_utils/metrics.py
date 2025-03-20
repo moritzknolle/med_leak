@@ -10,7 +10,6 @@ from ..data_utils.constants import (
     CXP_CHALLENGE_LABELS_IDX,
     CXR_LABELS,
 )
-from .utils import LabelType
 
 
 def tpr_at_fpr(

@@ -12,8 +12,7 @@ from src.data_utils.constants import CXP_CHALLENGE_LABELS_IDX
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
-from src.train_utils.utils import (MyCosineDecay, get_aug_fn,
-                                         grayscale_to_rgb)
+from src.train_utils.utils import MyCosineDecay, get_aug_fn, grayscale_to_rgb
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 60, "Number of training steps.")
@@ -99,7 +98,9 @@ def main(argv):
         overwrite_existing=False,
         one_image_per_patient=FLAGS.one_image_per_patient,
     )
-    imagenet_weights = FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"  
+    imagenet_weights = (
+        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+    )
 
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:

@@ -35,10 +35,10 @@ def mia_auc_esf_plot(
     aucs: np.ndarray,
     patient_ids: pd.Series = None,
     conf_level: float = 0.95,
-    aggregation_mode:str='max',
+    aggregation_mode: str = "max",
     save_path: Optional[str] = None,
     color: str = my_blue,
-    alpha:float=0.9,
+    alpha: float = 0.9,
     log_scale: bool = True,
     label: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
@@ -61,7 +61,9 @@ def mia_auc_esf_plot(
     # maybe aggregate record-level MIA AUCs by patient ID
     if patient_ids is not None:
         if not aggregation_mode in ["max", "mean"]:
-            raise ValueError("Please provide a valid aggregation model ('max' or 'mean').")
+            raise ValueError(
+                "Please provide a valid aggregation model ('max' or 'mean')."
+            )
         patient_auc_df = aggregate_by_patient(aucs, patient_ids)
         aucs = patient_auc_df[aggregation_mode]
         print(
@@ -86,7 +88,7 @@ def mia_auc_esf_plot(
         plt.ylabel("1 - Cumulative Probability")
         if log_scale:
             plt.semilogy()
-    ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[["right", "top"]].set_visible(False)
     if save_path is not None:
         plt.savefig(save_path, bbox_inches="tight")
 
@@ -246,7 +248,8 @@ def group_auc_top_boxplot(
         plt.savefig(save_path, bbox_inches="tight")
         plt.show()
 
-def get_sig_str(p_val:float)->str:
+
+def get_sig_str(p_val: float) -> str:
     if p_val <= 0.05:
         sig_str = "*"
         if p_val <= 0.01:
@@ -256,6 +259,7 @@ def get_sig_str(p_val:float)->str:
     else:
         sig_str = "n.s"
     return sig_str
+
 
 def composition_comparison_plot_overlapping_groups(
     df: pd.DataFrame,
@@ -294,7 +298,7 @@ def composition_comparison_plot_overlapping_groups(
     inner_width = bar_width * len(attr_vals)
     inner_height = 1.0
     # Define fixed sizes for the axes (in inches)
-    left_margin = 0.25 
+    left_margin = 0.25
     right_margin = 0.15
     bottom_margin = 0.25
     top_margin = 0.25
@@ -307,8 +311,10 @@ def composition_comparison_plot_overlapping_groups(
     h = [Size.Fixed(left_margin), Size.Fixed(inner_width), Size.Fixed(right_margin)]
     v = [Size.Fixed(bottom_margin), Size.Fixed(inner_height), Size.Fixed(top_margin)]
     divider = Divider(fig, (0, 0, 1, 1), h, v, aspect=False)
-    ax = fig.add_axes(divider.get_position(), axes_locator=divider.new_locator(nx=1, ny=1))
-    ax.hlines(y=0, xmin=-100, xmax=100, colors='gray', lw=1, alpha=0.25, zorder=-2)
+    ax = fig.add_axes(
+        divider.get_position(), axes_locator=divider.new_locator(nx=1, ny=1)
+    )
+    ax.hlines(y=0, xmin=-100, xmax=100, colors="gray", lw=1, alpha=0.25, zorder=-2)
     # filter out the top N most vulnerable patients
     top_n_df = df[df["MIA_AUC"] > df["MIA_AUC"].quantile(1 - top_n / len(df))]
     assert len(top_n_df) == top_n, f"Expected {top_n} patients, got {len(top_n_df)}"
@@ -316,6 +322,7 @@ def composition_comparison_plot_overlapping_groups(
     observed_counts = top_n_df[group_cols].sum().values
     residual = (observed_counts - expected_counts) / np.sqrt(expected_counts)
     rel_diff = (observed_counts - expected_counts) / expected_counts
+    print("... expected composition (overall dataset):\n", df[group_cols].mean(), "\n... observed composition (99th percentile):\n", top_n_df[group_cols].mean())
     print(f"... relative differences (%): {rel_diff}")
     print(f"... Pearson residuals: {residual}")
     # color by group size in overall population
@@ -330,38 +337,54 @@ def composition_comparison_plot_overlapping_groups(
         color=colors,
         linewidth=1,
         edgecolor="black",
-        width=4*bar_width,
-        align='center'
+        width=4 * bar_width,
+        align="center",
     )
     bar_positions = [bar.get_x() + bar.get_width() / 2 for bar in bars]
     ax.set_ylabel("Pearson Residual")
     ax.grid(visible=False, axis="both")
-    ax.set_xlim((bar_positions[0] - (bar_width/2) - inner_padding, bar_positions[-1] + (bar_width/2) + inner_padding))
+    ax.set_xlim(
+        (
+            bar_positions[0] - (bar_width / 2) - inner_padding,
+            bar_positions[-1] + (bar_width / 2) + inner_padding,
+        )
+    )
     sm = plt.cm.ScalarMappable(cmap=cm, norm=norm)  # ScalarMappable for the colorbar
     sm.set_array([])
     cbar = fig.colorbar(
-        sm, ax=ax, orientation="vertical", shrink=0.66, pad=0.025, fraction=1.0, anchor=(1.0, 0.3)
+        sm,
+        ax=ax,
+        orientation="vertical",
+        shrink=0.66,
+        pad=0.025,
+        fraction=1.0,
+        anchor=(1.0, 0.3),
     )
     cbar.ax.set_title("%", pad=5, loc="center")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-    ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[["right", "top"]].set_visible(False)
     ax.set_xlabel("")
     if save_path:
-        assert isinstance(save_path, Path) and save_path.exists(), f"Invalid path: {save_path}"
         plt.savefig(save_path, bbox_inches="tight")
         plt.show()
-        results_dict = {"Groups":attr_vals, "Pearson Residual":residual, "Relative Delta":rel_diff, "Relative Frequency": overall_counts}
+        results_dict = {
+            "Groups": attr_vals,
+            "Pearson Residual": residual,
+            "Relative Delta": rel_diff,
+            "Relative Frequency": overall_counts,
+        }
         if save_csv:
-            csv_dir = Path("/".join(save_path.parts[:-1]) + "/scatter_data") 
+            csv_dir = Path("/".join(save_path.parts[:-1]) + "/scatter_data")
             csv_dir.mkdir(exist_ok=True)
             csv_path = csv_dir / f"{xlabel}_ns.csv"
             results_df = pd.DataFrame.from_dict(results_dict)
             results_df.to_csv(csv_path)
 
+
 def composition_comparison_plot(
     df: pd.DataFrame,
     group_col: str,
-    col_vals:List[Union[str]],
+    col_vals: List[Union[str]],
     xlabel: str,
     top_k_percent: int = 1,
     color_dict: Optional[Dict] = None,
@@ -387,6 +410,7 @@ def composition_comparison_plot(
     Returns:
         None
     """
+    print(f"... Subgroup composition comparison: {group_col}")
     assert isinstance(df, pd.DataFrame), f"Expected pd.DataFrame, got {type(df)}"
     assert (
         group_col in df.columns
@@ -399,7 +423,7 @@ def composition_comparison_plot(
     inner_width = bar_width * len(attr_vals)
     inner_height = 1.0
     # Define fixed sizes for the axes (in inches)
-    left_margin = 0.25 
+    left_margin = 0.25
     right_margin = 0.15
     bottom_margin = 0.25
     top_margin = 0.25
@@ -412,8 +436,10 @@ def composition_comparison_plot(
     h = [Size.Fixed(left_margin), Size.Fixed(inner_width), Size.Fixed(right_margin)]
     v = [Size.Fixed(bottom_margin), Size.Fixed(inner_height), Size.Fixed(top_margin)]
     divider = Divider(fig, (0, 0, 1, 1), h, v, aspect=False)
-    ax = fig.add_axes(divider.get_position(), axes_locator=divider.new_locator(nx=1, ny=1))
-    ax.hlines(y=0, xmin=-100, xmax=100, colors='gray', lw=1, alpha=0.25, zorder=-2)
+    ax = fig.add_axes(
+        divider.get_position(), axes_locator=divider.new_locator(nx=1, ny=1)
+    )
+    ax.hlines(y=0, xmin=-100, xmax=100, colors="gray", lw=1, alpha=0.25, zorder=-2)
     assert (
         df[group_col].isna().sum() == 0
     ), f"Missing values in {group_col}, {df[group_col].isna().sum()}"
@@ -430,10 +456,10 @@ def composition_comparison_plot(
         expected_counts
     ), f"Expected {len(expected_counts)} values, got {len(observed_counts)}"
     print(
-        "... calculating chi-squared test with counts expected:",
-        expected_counts,
-        "observed:",
-        observed_counts,
+        "... expected composition (overall dataset):\n",
+        df[group_col].value_counts(normalize=True, sort=False),
+        "\n... observed composition (99th percentile):\n",
+        top_n_df[group_col].value_counts(normalize=True, sort=False).reindex(attr_vals, fill_value=0),
     )
     chisq_statistic, p_value = scipy.stats.chisquare(
         f_obs=observed_counts, f_exp=expected_counts
@@ -442,6 +468,7 @@ def composition_comparison_plot(
     residual = (observed_counts - expected_counts) / (np.sqrt(expected_counts))
     rel_diff = (observed_counts - expected_counts) / expected_counts
     print(f"... relative differences (%): {residual}")
+    print("---------------------------------------------------------------------------")
     # color by group size in overall population
     cm = plt.get_cmap("Blues")
     overall_counts = df[group_col].value_counts(normalize=True, sort=False).values * 100
@@ -450,9 +477,15 @@ def composition_comparison_plot(
     colors = [cm(norm(c)) for c in overall_counts]
     if not isinstance(attr_vals[0], str):
         attr_vals = [str(a) for a in attr_vals]
-    assert set(attr_vals) == set(col_vals), f"Found unexpected column values, expected {set(col_vals)} and got {set(attr_vals)}"
+    assert set(attr_vals) == set(
+        col_vals
+    ), f"Found unexpected column values, expected {set(col_vals)} and got {set(attr_vals)}"
     # make sure the bars are in the correct order
-    ordered_data = [(cat, val, color) for cat, val, color in zip(attr_vals, residual, colors) if cat in attr_vals]
+    ordered_data = [
+        (cat, val, color)
+        for cat, val, color in zip(attr_vals, residual, colors)
+        if cat in attr_vals
+    ]
     ordered_data.sort(key=lambda x: col_vals.index(x[0]))
     cats_sorted, data_sorted, colors_sorted = zip(*ordered_data)
     bars = ax.bar(
@@ -461,38 +494,65 @@ def composition_comparison_plot(
         color=colors_sorted,
         linewidth=1,
         edgecolor="black",
-        width=4*bar_width,
-        align='center'
-
+        width=4 * bar_width,
+        align="center",
     )
     bar_positions = [bar.get_x() + bar.get_width() / 2 for bar in bars]
     ax.set_ylabel("Pearson Residual")
     ax.grid(visible=False, axis="both")
-    ax.set_xlim((bar_positions[0] - (bar_width/2) - inner_padding, bar_positions[-1] + (bar_width/2) + inner_padding))
+    ax.set_xlim(
+        (
+            bar_positions[0] - (bar_width / 2) - inner_padding,
+            bar_positions[-1] + (bar_width / 2) + inner_padding,
+        )
+    )
     sm = plt.cm.ScalarMappable(cmap=cm, norm=norm)  # ScalarMappable for the colorbar
     sm.set_array([])
     cbar = fig.colorbar(
-        sm, ax=ax, orientation="vertical", shrink=0.66, pad=0.025, fraction=1.0, anchor=(1.0, 0.3)
+        sm,
+        ax=ax,
+        orientation="vertical",
+        shrink=0.66,
+        pad=0.025,
+        fraction=1.0,
+        anchor=(1.0, 0.3),
     )
     cbar.ax.set_title("%", pad=5, loc="center")
     ax.grid(visible=False, axis="x")
     ax.set_xlabel("")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-    ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[["right", "top"]].set_visible(False)
     textstr = r"{}, $\chi^2$={}".format(get_sig_str(p_value), round(chisq_statistic, 1))
-    props = dict(facecolor='#FAFAFA', boxstyle='round', alpha=1.0, lw=0.75)
-    ax.text(0.95, 1.15, textstr, transform=ax.transAxes, fontsize=5,
-        verticalalignment='top', bbox=props)
+    props = dict(facecolor="#FAFAFA", boxstyle="round", alpha=1.0, lw=0.75)
+    ax.text(
+        0.95,
+        1.15,
+        textstr,
+        transform=ax.transAxes,
+        fontsize=5,
+        verticalalignment="top",
+        bbox=props,
+    )
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
         plt.show()
-        results_dict = {"Groups":attr_vals, "Pearson Residual":residual, "Relative Delta":rel_diff, "Relative Frequency": overall_counts}
+        results_dict = {
+            "Groups": attr_vals,
+            "Pearson Residual": residual,
+            "Relative Delta": rel_diff,
+            "Relative Frequency": overall_counts,
+        }
         if save_csv:
-            csv_dir = Path("/".join(save_path.parts[:-1]) + "/scatter_data") 
+            csv_dir = Path("/".join(save_path.parts[:-1]) + "/scatter_data")
             csv_dir.mkdir(exist_ok=True)
-            csv_path = csv_dir / f"{group_col}.csv" if p_value <= 0.05 else csv_dir / f"{group_col}_ns.csv"
+            csv_path = (
+                csv_dir / f"{group_col}.csv"
+                if p_value <= 0.05
+                else csv_dir / f"{group_col}_ns.csv"
+            )
             results_df = pd.DataFrame.from_dict(results_dict)
             results_df.to_csv(csv_path)
+
 
 def disease_group_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
     out_path = out_path / "subgroup_plots"
@@ -556,7 +616,7 @@ def disease_group_plots(dataset_name: str, results_df: pd.DataFrame, out_path: P
             save_path=out_path / f"{dataset_name}_composition_plot_disease_coarse.pdf",
             xlabel="Disease",
             draw_xticks=False,
-            col_vals=FITZPATRICK_LABELS_COARSE_SHORT
+            col_vals=FITZPATRICK_LABELS_COARSE_SHORT,
         )
         color_dict = {
             k: plt.cm.tab20(i) for i, k in enumerate(FITZPATRICK_LABELS_FINE_SHORT)
@@ -573,12 +633,12 @@ def disease_group_plots(dataset_name: str, results_df: pd.DataFrame, out_path: P
             save_path=out_path / f"{dataset_name}_composition_plot_disease.pdf",
             xlabel="Disease",
             draw_xticks=False,
-            col_vals=FITZPATRICK_LABELS_FINE_SHORT
+            col_vals=FITZPATRICK_LABELS_FINE_SHORT,
         )
     elif dataset_name == "embed":
         color_dict = {k: plt.cm.tab20(i) for i, k in enumerate(EMBED_LABELS_SHORT)}
         # drop all cases with exam label X (unknown)
-        results_df = results_df.loc[results_df['asses']!= "X"]
+        results_df = results_df.loc[results_df["asses"] != "X"]
         birads_labels = ["BIRADS A", "BIRADS B", "BIRADS C", "BIRADS D"]
         results_df["tissueden"] = results_df["tissueden"].replace(
             {a: b for a, b in zip(birads_labels, EMBED_LABELS_SHORT)}
@@ -630,7 +690,7 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             color_dict=CXR_COLORS,
             save_path=out_path / f"{dataset_name}_composition_plot_race.pdf",
             xlabel="Race",
-            col_vals=["Black", "White", "Asian"]
+            col_vals=["Black", "White", "Asian"],
         )
         group_mia_auc_esf_plot(
             df=results_df,
@@ -685,7 +745,7 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             color_dict=view_colors_dict,
             save_path=out_path / f"{dataset_name}_composition_plot_view.pdf",
             xlabel="Imaging View",
-            col_vals=["AP", "PA", "LATERAL", "LL"]
+            col_vals=["AP", "PA", "LATERAL", "LL"],
         )
     elif dataset_name == "chexpert":
         group_mia_auc_esf_plot(
@@ -775,7 +835,7 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             color_dict=CXR_COLORS,
             save_path=out_path / f"{dataset_name}_auc_esf_race.pdf",
         )
-        
+
         group_auc_top_boxplot(
             df=results_df,
             group_col="race",
@@ -793,7 +853,9 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             save_csv=False,
         )
         # control for confounding by disease label
-        filtered_df = results_df[results_df["disease_label"].isin([0, 1])] # only healthy patients or those with non-vision-threatening DR
+        filtered_df = results_df[
+            results_df["disease_label"].isin([0, 1])
+        ]  # only healthy patients or those with non-vision-threatening DR
         composition_comparison_plot(
             df=filtered_df,
             group_col="race",
@@ -826,8 +888,10 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             col_vals=["Female", "Male"],
         )
     elif dataset_name == "fitzpatrick":
-        results_df["Fitzpatrick Skin Type"] = results_df["Fitzpatrick Skin Type"].str.split(" ").str[1]
-        fitz_colors = {k.split(" ")[1]:v for k,v in FITZPATRICK_COLORS.items()}
+        results_df["Fitzpatrick Skin Type"] = (
+            results_df["Fitzpatrick Skin Type"].str.split(" ").str[1]
+        )
+        fitz_colors = {k.split(" ")[1]: v for k, v in FITZPATRICK_COLORS.items()}
         group_mia_auc_esf_plot(
             df=results_df,
             group_col="Fitzpatrick Skin Type",
@@ -853,7 +917,7 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             color_dict=fitz_colors,
             save_path=out_path / f"{dataset_name}_composition_plot_fitzpatrick.pdf",
             xlabel="Fitzpatrick Skin Type\n",
-            col_vals=["I/II", "III/IV", "V/VI"]
+            col_vals=["I/II", "III/IV", "V/VI"],
         )
     elif dataset_name == "embed":
         group_mia_auc_esf_plot(
@@ -878,10 +942,12 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             save_path=out_path / f"{dataset_name}_composition_plot_race.pdf",
             xlabel="Race",
             col_vals=["Black", "White", "Asian"],
-            save_csv=False, # only save csv of race comparison not confounded by breast density
+            save_csv=False,  # only save csv of race comparison not confounded by breast density
         )
         # eliminate breast density as possible confounder
-        filtered_df = results_df[results_df["tissueden"].isin(["BIRADS B", "BIRARDS C"])]
+        filtered_df = results_df[
+            results_df["tissueden"].isin(["BIRADS B", "BIRARDS C"])
+        ]
         composition_comparison_plot(
             df=filtered_df,
             group_col="RACE_DESC",
@@ -891,7 +957,7 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             col_vals=["Black", "White", "Asian"],
         )
         composition_comparison_plot(
-            df=results_df[results_df["tissueden"]=="BIRADS D"],
+            df=results_df[results_df["tissueden"] == "BIRADS D"],
             group_col="RACE_DESC",
             color_dict=CXR_COLORS,
             save_path=out_path / f"{dataset_name}_composition_plot_race@BIRADS-D.pdf",
