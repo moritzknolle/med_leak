@@ -15,11 +15,9 @@ def get_dataset(
     csv_root: Path,
     data_root: Path,
     save_root: Path,
-    one_image_per_patient: bool = False,
     get_numpy: bool = False,
     load_from_disk: bool = False,
     overwrite_existing: bool = False,
-    frontal_only: bool = False,
 ):
     """
     Convenience function to retrieve a dataset by name. Raises a ValueError if the dataset is unknown.
@@ -29,19 +27,15 @@ def get_dataset(
             csv_root: Path, path to the csv files
             data_root: Path, path to the data files
             save_root: Path, path to the save root
-            one_image_per_patient: bool, whether to use only one image per patient
             get_numpy: bool, whether to return numpy arrays
             load_from_disk: bool, whether to load from disk
             overwrite_existing: bool, whether to overwrite existing files
-            frontal_only: bool, whether to use only frontal images (only for MIMIC-CXR/Chexpert)
         Returns:
             train_dataset: either tuple of numpy arrays or a BaseDataset object
     """
     if dataset_name == "chexpert":
         cxp_df_path = (
             csv_root / "chexpert_train.csv"
-            if one_image_per_patient
-            else csv_root / "chexpert_train_full.csv"
         )
         cxp_df = pd.read_csv(cxp_df_path)
         cxp_test_df = pd.read_csv(csv_root / "chexpert_test.csv")
@@ -49,46 +43,41 @@ def get_dataset(
         train_dataset = CXRDataset(
             df=cxp_df,
             img_path=data_root,
-            name="chexpert" if one_image_per_patient else "chexpert_full",
+            name="chexpert",
             img_size=img_size,
             split="train",
             save_root=save_root,
             memmap=use_memmap,
-            frontal_only=frontal_only,
         )
         test_dataset = CXRDataset(
             df=cxp_test_df,
             img_path=data_root,
-            name="chexpert" if one_image_per_patient else "chexpert_full",
+            name="chexpert",
             img_size=img_size,
             split="test",
             save_root=save_root,
         )
     elif dataset_name == "mimic":
         csv_path = (
-            csv_root / "mimic_df.csv"
-            if one_image_per_patient
-            else csv_root / "mimic_df_full.csv"
+            csv_root / "mimic_train.csv"
         )
         mimic_df = pd.read_csv(csv_path)
-        mimic_train = mimic_df[mimic_df.split == "train"]
         use_memmap = img_size > 128
         train_dataset = CXRDataset(
-            df=mimic_train,
+            df=mimic_df,
             img_path=data_root / "files",
-            name="mimic" if one_image_per_patient else "mimic_full",
+            name="mimic",
             img_size=img_size,
             split="train",
             save_root=save_root,
             memmap=use_memmap,
-            frontal_only=frontal_only,
         )
         # use CheXpert test set since labels are verified by experts (consensus voting of three board-certified radiologists)
         cxp_test_df = pd.read_csv(csv_root / "chexpert_test.csv")
         test_dataset = CXRDataset(
             df=cxp_test_df,
             img_path=data_root,
-            name="chexpert" if one_image_per_patient else "chexpert_full",
+            name="chexpert",
             img_size=img_size,
             split="test",
             save_root=save_root,
@@ -119,8 +108,6 @@ def get_dataset(
     elif dataset_name == "embed":
         embed_df = (
             pd.read_csv("./data/csv/embed.csv")
-            if one_image_per_patient
-            else pd.read_csv("./data/csv/embed_full.csv")
         )
         train_df, test_df = (
             embed_df[embed_df.split == "train"],
@@ -130,7 +117,7 @@ def get_dataset(
         train_dataset = EMBEDataset(
             df=train_df,
             img_path=data_root,
-            name="embed" if one_image_per_patient else "embed_full",
+            name="embed",
             img_size=img_size,
             split="train",
             save_root=save_root,
@@ -139,7 +126,7 @@ def get_dataset(
         test_dataset = EMBEDataset(
             df=test_df,
             img_path=data_root,
-            name="embed" if one_image_per_patient else "embed_full",
+            name="embed",
             img_size=img_size,
             split="test",
             save_root=save_root,

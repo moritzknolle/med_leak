@@ -54,11 +54,6 @@ flags.DEFINE_boolean(
     False,
     "Whether to use the full training dataset (Not the random subset otherwise used for leave-many-out re-training). This only has an effect when --eval_only is set to True.",
 )
-flags.DEFINE_boolean(
-    "one_image_per_patient",
-    False,
-    "Whether to only use one image per patient or alternatively the full dataset.",
-)
 flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
     "n_runs", 200, "Number of leave-many-out re-training runs to perform."
@@ -96,7 +91,6 @@ def main(argv):
         get_numpy=True,
         load_from_disk=True,
         overwrite_existing=False,
-        one_image_per_patient=FLAGS.one_image_per_patient,
     )
     imagenet_weights = (
         FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
