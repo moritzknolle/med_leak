@@ -94,3 +94,5 @@ FAIRVISION_LABELS = [
     "late amd",
 ]
 FAIRVISION_LABELS_SHORT = ["H", "NVT-DR", "VT-DR", "G", "E-AMD", "I-AMD", "L-AMD"]
+
+ECG_LABELS = ["NORM", "MI", "STTC", "CD", "HYP"]

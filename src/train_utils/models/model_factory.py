@@ -6,6 +6,7 @@ import keras
 from .small_models import get_small_cnn
 from .vit.vision_transformer import vit_b8, vit_b16, vit_b32, vit_l16, vit_l32
 from .wide_resnet import get_wide_resnet
+from .resnet_1d import build_1d_resnet, build_tabular_resnet
 
 
 def get_model(
@@ -101,6 +102,21 @@ def get_model(
                 keras.layers.Dense(num_classes, dtype="float32"),
             ]
         )
+    elif model_name.split("_")[0] == "resnet1d" or model_name == "resnet1d":
+        nb_feature_maps = int(model_name.split("_")[1]) if len(model_name.split("_")) > 1 else 64
+        model = build_1d_resnet(nb_classes=num_classes, input_shape=(1_000, in_channels), nb_feature_maps=nb_feature_maps)
+    elif model_name.split("_")[0] == "tabresnet":
+        _, width, n_blocks = model_name.split("_")
+        width = int(width)
+        n_blocks = int(n_blocks)
+        model = build_tabular_resnet(
+            input_shape=(in_channels,),
+            width=width,
+            depth=n_blocks,
+            dropout_rate=dropout,
+            num_classes=num_classes,
+        )
+        
     elif model_name.split("_")[0] == "vit":
         if len(model_name.split("_")) != 3:
             raise ValueError(

@@ -441,5 +441,5 @@ def record_MIA_ROC_analysis(
     print(f"Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
     assert (
         np.count_nonzero(np.isnan(aucs)) == 0
-    ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}"
+    ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}, mean={np.nanmean(aucs)}, std={np.nanstd(aucs)}, min={np.nanmin(aucs)}, max={np.nanmax(aucs)}"
     return fprs, tprs, aucs, se_aucs

@@ -4,7 +4,7 @@ import os
 import pickle
 import time
 from pathlib import Path
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import keras
 import numpy as np
@@ -25,7 +25,7 @@ def prepare_dataset(
     batch_size: int,
     shuffle: bool,
     augment: bool,
-    aug_fn: Callable = None,
+    aug_fn: Optional[Callable] = None,
 ):
     """
     Prepare a tf.data.Dataset from the given inputs and targets np arrays.
@@ -44,18 +44,8 @@ def prepare_dataset(
     # shape checks
     assert inputs.shape[0] == targets.shape[0], "Found mismatching number of samples"
     assert (
-        len(inputs.shape) == 4
-    ), f"Found mismatching input shape, expected NHWC and found: {inputs.shape}"
-    assert (
-        inputs.shape[1] == inputs.shape[2]
-    ), f"Found mismatching image size: {inputs.shape[1]} != {inputs.shape[2]}"
-    assert (
         inputs.max() != 255.0
     ), f"Make sure inputs are normalised appropriately, found max(inputs)={inputs.max()}"
-    # check labels are one-hot or multi-hot encoded
-    assert (
-        targets.shape[1] > 1
-    ), "Found sparse label encoding, please pass one-hot or multi-hot encoded labels only"
     assert (
         inputs.dtype == keras.backend.floatx()
         and inputs.dtype == keras.backend.floatx()
@@ -209,12 +199,13 @@ def train_and_eval(
         test_batch = next(iter(test_dataset.take(1)))
         random_idcs = np.random.randint(0, train_batch[0].shape[0], size=15)
         for i, idc in enumerate(random_idcs):
-            tf.keras.preprocessing.image.save_img(
-                f"{tmp_dir}/train_{i}.png", train_batch[0][i]
-            )
-            tf.keras.preprocessing.image.save_img(
-                f"{tmp_dir}/test_{i}.png", test_batch[0][i]
-            )
+            if train_batch[0].shape[-1] in [1,3]:
+                tf.keras.preprocessing.image.save_img(
+                    f"{tmp_dir}/train_{i}.png", train_batch[0][i]
+                )
+                tf.keras.preprocessing.image.save_img(
+                    f"{tmp_dir}/test_{i}.png", test_batch[0][i]
+                )
     if overfit:
 
         def first_batch_only(dataset: tf.data.Dataset):

@@ -6,7 +6,9 @@ import pandas as pd
 from src.data_utils.datasets import (CXRDataset, EMBEDataset,
                                            FairVisionDataset,
                                            FitzPatLabelSetting,
-                                           FitzpatrickDataset)
+                                           FitzpatrickDataset,
+                                           PTBXLDataset,
+                                           MIMICIVEDDataset)
 
 
 def get_dataset(
@@ -154,6 +156,37 @@ def get_dataset(
             split="test",
             save_root=save_root,
         )
+    elif dataset_name == "ptb-xl":
+        train_df = pd.read_csv(csv_root / "ptb-xl_train.csv")
+        test_df = pd.read_csv(csv_root / "ptb-xl_test.csv")
+        train_dataset = PTBXLDataset(
+            df=train_df,
+            img_path=data_root,
+            name="ptb-xl",
+            split="train",
+            save_root=save_root,
+        )
+        test_dataset = PTBXLDataset(
+            df=test_df,
+            img_path=data_root,
+            name="ptb-xl",
+            split="test",
+            save_root=save_root,
+        )
+    elif dataset_name == "mimic-iv-ed":
+        train_df = pd.read_csv(csv_root / "mimic-iv-ed_train.csv")
+        test_df = pd.read_csv(csv_root / "mimic-iv-ed_test.csv")
+        train_dataset = MIMICIVEDDataset(
+            dataframe=train_df
+        )
+        test_dataset = MIMICIVEDDataset(
+            dataframe=test_df
+        )
+        # MIMICIVEDDataset does not support iterative loading of data, so we return the full data directly
+        if get_numpy:
+            x_train, y_train = train_dataset.__get_all_inputs__(), train_dataset.__get_all_targets__()
+            x_test, y_test = test_dataset.__get_all_inputs__(), test_dataset.__get_all_targets__()
+            return (x_train, y_train), (x_test, y_test)
     else:
         raise ValueError(f"Unknown dataset {dataset_name}")
     if get_numpy:
@@ -166,11 +199,11 @@ def get_dataset(
             load_from_disk=load_from_disk, overwrite_existing=overwrite_existing
         )
         # add channel dimension if necessary
-        if len(x_train.shape) == 3:
+        if len(x_train.shape) == 3 and x_train.shape[1]==x_train.shape[2]:
             x_train = np.expand_dims(x_train, axis=-1)
             x_test = np.expand_dims(x_test, axis=-1)
         # convert to channels last if necessary
-        if not x_train.shape[-1] in [1, 3]:
+        if not x_train.shape[-1] in [1, 3, 12]:
             x_train = np.transpose(x_train, (0, 2, 3, 1))
             x_test = np.transpose(x_test, (0, 2, 3, 1))
         # shape checks

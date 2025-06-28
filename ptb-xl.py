@@ -4,6 +4,8 @@ from pathlib import Path
 # set keras backend to jax and enable compilation caching
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]= "false"
+
 import keras
 import numpy as np
 from absl import app, flags
@@ -11,24 +13,28 @@ from absl import app, flags
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
-from src.train_utils.utils import (LabelType, MyCosineDecay, get_aug_fn,
-                                   grayscale_to_rgb)
+from src.train_utils.utils import (
+    MyCosineDecay,
+    get_aug_fn,
+)
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 30, "Number of training steps.")
-flags.DEFINE_float("learning_rate", 1e-1, "Learning rate.")
-flags.DEFINE_float("weight_decay", 1e-8, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 512, "Batch size.")
+flags.DEFINE_integer("epochs", 100, "Number of training steps.")
+flags.DEFINE_float("learning_rate", 2.0, "Learning rate.")
+flags.DEFINE_float("weight_decay", 5e-3, "L2 weight decay.")
 flags.DEFINE_float("momentum", 0.9, "Momentum parameter.")
+flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "wrn_28_2", "Name of the model to use.")
+flags.DEFINE_string("model", "resnet1d_128", "Name of the model to use.")
 flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
-    "lr_warmup", 0.1, "Relative steps to perform linear learning rate warmup."
+    "lr_warmup",
+    0.05,
+    "Relative fraction of steps to perform linear learning rate warmup.",
 )
 flags.DEFINE_float(
     "decay_steps",
@@ -40,11 +46,10 @@ flags.DEFINE_integer("grad_accum_steps", 2, "Number of gradient accumulation ste
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_enum(
     "augment",
-    "weak",
-    ["trivial", "weak", "medium", "strong", "none"],
+    "none",
+    ["trivial", "weak", "medium", "strong", "rotate", "none"],
     "What type of data augmentations strength to apply.",
 )
-flags.DEFINE_integer("img_size", 64, "Image size.")
 flags.DEFINE_boolean(
     "mixed_precision",
     True,
@@ -59,6 +64,11 @@ flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
     "n_runs", 200, "Number of leave-many-out re-training runs to perform."
 )
+flags.DEFINE_string(
+    "save_root",
+    "/home/moritz/data_fast/npy",
+    "Path to root folder where the memmap files are stored.",
+)
 flags.DEFINE_float(
     "subset_ratio", 0.5, "Ratio of the training data to use for each re-training run."
 )
@@ -66,13 +76,8 @@ flags.DEFINE_integer(
     "eval_views", 16, "Number of augmentations to query when saving train/test logits."
 )
 flags.DEFINE_string(
-    "save_root",
-    "/home/moritz/data_fast/npy",
-    "Path to root folder where the memmap files are stored.",
-)
-flags.DEFINE_string(
     "logdir",
-    "./logs/embed/",
+    "./logs/ptb-xl/",
     "Path to logdir.",
 )
 
@@ -81,35 +86,34 @@ def main(argv):
     np.random.seed(FLAGS.seed)
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 4
-
+    NUM_CLASSES = 5
+    base_path = "/home/moritz/data_fast/npy/ptb-xl/ptb-xl"
     (x_train, y_train), (x_test, y_test) = get_dataset(
-        dataset_name="embed",
-        img_size=FLAGS.img_size,
+        dataset_name="ptb-xl",
+        img_size=0,
         csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data_massive/embed_small/processed_2048x1536"),
+        data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
         save_root=Path(FLAGS.save_root),
         get_numpy=True,
         load_from_disk=True,
         overwrite_existing=True,
     )
-    imagenet_weights = (
-        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-    )
+    print(x_train.shape, y_train.shape)
+    print(x_test.shape, y_test.shape)
+
     STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
     if not FLAGS.full_train_dataset:
         STEPS = int(STEPS * FLAGS.subset_ratio)
 
     def get_compiled_model():
-        preprocess_fn = grayscale_to_rgb if imagenet_weights else None
-        print("... preprocess_fn", preprocess_fn)
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=FLAGS.img_size,
-            in_channels=1,
+            img_size=None,
+            in_channels=12,
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
+            preprocessing_func=None,
         )
         schedule = MyCosineDecay(
             base_lr=FLAGS.learning_rate,
@@ -129,10 +133,12 @@ def main(argv):
         # compile model
         model.compile(
             optimizer=opt,
-            loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+            loss=keras.losses.BinaryCrossentropy(from_logits=True),
             metrics=[
                 keras.metrics.CategoricalAccuracy(),
-                keras.metrics.AUC(from_logits=True),
+                keras.metrics.AUC(
+                    multi_label=True, from_logits=True, name="macro_auroc"
+                ),  # macro AUROC over all classes
             ],
         )
         return model
@@ -159,11 +165,11 @@ def main(argv):
             aug_fn=get_aug_fn(FLAGS.augment),
             augment=True if FLAGS.augment != "None" else False,
             epochs=FLAGS.epochs,
-            target_metric="val_auc",
+            target_metric="val_macro_auroc",
             callbacks=get_callbacks(FLAGS.ema),
             seed=FLAGS.seed,
             log_wandb=FLAGS.log_wandb,
-            wandb_project_name="embed",
+            wandb_project_name="ptb-xl",
         )
     else:
         while True:
@@ -176,15 +182,15 @@ def main(argv):
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,
                     epochs=FLAGS.epochs,
+                    target_metric="val_macro_auroc",
                     seed=FLAGS.seed,
-                    target_metric="val_auc",
                     logdir=Path(FLAGS.logdir),
                     n_total_runs=FLAGS.n_runs,
                     subset_ratio=FLAGS.subset_ratio,
                     n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
                     callbacks=get_callbacks(FLAGS.ema),
                     log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="embed",
+                    wandb_project_name="ptb-xl",
                 )
                 model = get_compiled_model()
             except StopIteration:

@@ -16,6 +16,7 @@ from .constants import (
     FITZPATRICK_LABELS_COARSE,
     FITZPATRICK_LABELS_FINE,
     CXRLabelStrategy,
+    ECG_LABELS,
 )
 
 
@@ -30,7 +31,7 @@ class BaseDataset:
         img_path (Path): The path to the images
         name (str): The name of the dataset
         num_classes (int): The number of classes in the dataset
-        img_channels (int): The number of channels in the images
+        in_channels (int): The number of channels in the images
         img_size (int): The size of the images
         split (str): The split of the dataset (train, val, test)
         save_root (Path): The path to save the dataset
@@ -46,7 +47,7 @@ class BaseDataset:
         img_path: Path,
         name: str,
         num_classes: int,
-        img_channels: int,
+        in_channels: int,
         img_size: int,
         split: str,
         save_root: Path,
@@ -61,7 +62,7 @@ class BaseDataset:
         self.num_classes = num_classes
         self.save_root = Path(save_root) / name
         self.split = split
-        self.img_channels = img_channels
+        self.in_channels = in_channels
         self.img_size = img_size
         self.filename = f"{name}_{split}_{self.img_size}x{self.img_size}"
         self.n_threads = n_threads
@@ -90,7 +91,9 @@ class BaseDataset:
         Load the dataset into memory by iterating through it.
         """
         success = False
-        convenience_fn_exists = callable(getattr(self, '__get_all_targets__', None))
+        convenience_target_fn_exists = callable(
+            getattr(self, "__get_all_targets__", None)
+        )
         if not self.memmap:
             with mp.Pool(self.n_threads) as pool:
                 inputs = list(
@@ -102,7 +105,7 @@ class BaseDataset:
                         total=self.__len__(),
                     )
                 )
-                if not convenience_fn_exists:
+                if not convenience_target_fn_exists:
                     targets = list(
                         tqdm(
                             pool.imap(
@@ -123,7 +126,7 @@ class BaseDataset:
                 f"{self.save_root}/{self.filename}_inputs.mmp",
                 dtype=np.float32,
                 mode="w+",
-                shape=(self.__len__(), self.img_size, self.img_size, self.img_channels),
+                shape=(self.__len__(), self.img_size, self.img_size, self.in_channels),
             )
             self.targets = np.memmap(
                 f"{self.save_root}/{self.filename}_targets.mmp",
@@ -131,11 +134,15 @@ class BaseDataset:
                 mode="w+",
                 shape=(self.__len__(), self.num_classes),
             )
-            if convenience_fn_exists:
+            if convenience_target_fn_exists:
                 targets = self.__get_all_targets__()
             for i in tqdm(range(self.__len__()), desc="Loading data"):
                 self.inputs[i] = self.__getinput__(i)
-                self.targets[i] = self.__gettarget__(i) if not convenience_fn_exists else targets[i]
+                self.targets[i] = (
+                    self.__gettarget__(i)
+                    if not convenience_target_fn_exists
+                    else targets[i]
+                )
                 self.inputs.flush()
                 self.targets.flush()
             success = True
@@ -266,7 +273,7 @@ class CXRDataset(BaseDataset):
             img_path=img_path,
             name=name,
             num_classes=14,
-            img_channels=1,
+            in_channels=1,
             img_size=img_size,
             split=split,
             save_root=save_root,
@@ -345,7 +352,7 @@ class FitzpatrickDataset(BaseDataset):
             img_path=img_path,
             name=name,
             num_classes=num_classes,
-            img_channels=3,
+            in_channels=3,
             img_size=img_size,
             split=split,
             save_root=save_root,
@@ -396,7 +403,7 @@ class EMBEDataset(BaseDataset):
             img_path=img_path,
             name=name,
             num_classes=4,
-            img_channels=1,
+            in_channels=1,
             img_size=img_size,
             split=split,
             save_root=save_root,
@@ -450,7 +457,7 @@ class FairVisionDataset(BaseDataset):
             img_path=img_path,
             name=name,
             num_classes=7,
-            img_channels=1,
+            in_channels=1,
             img_size=img_size,
             split=split,
             save_root=save_root,
@@ -474,3 +481,145 @@ class FairVisionDataset(BaseDataset):
 
     def __len__(self) -> int:
         return len(self.dataframe)
+
+
+class PTBXLDataset(BaseDataset):
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        img_path: Path,  # path to .npy file containing the ECG signals
+        name: str,
+        split: str,
+        save_root: Path,
+    ):
+
+        super().__init__(
+            df=df,
+            img_path=img_path,
+            name=name,
+            num_classes=5,
+            in_channels=12,
+            img_size=0,  # Not used for ECG, but required by the interface
+            split=split,
+            save_root=save_root,
+        )
+        self.ecg_inputs = np.load(img_path / f"X_100_{split}.npy")
+
+    def __getinput__(self, index: int):
+        """Returns input corresponding to index i in the dataset"""
+        # TODO check whether to apply normalization here or not
+        return self.ecg_inputs[index]
+
+    def __gettarget__(self, index: int):
+        target = self.dataframe.iloc[index][ECG_LABELS]
+        target = np.array(target, dtype=np.float16)
+        return target
+
+    def __get_all_targets__(self):
+        """Returns all targets in the dataset"""
+        targets = self.dataframe[ECG_LABELS]
+        targets = np.array(targets, dtype=np.float16)
+        return targets
+
+    def __len__(self) -> int:
+        """Returns the length of the dataset"""
+        return len(self.dataframe)
+
+
+class MIMICIVEDDataset:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+    ):
+        self.dataframe = dataframe
+        self.dataframe["gender_binarized"] = 0
+        self.dataframe.loc[self.dataframe.gender=="F", "gender_binarized"] = 1
+        self.input_variables = [
+            "age",
+            "gender_binarized",
+            "n_ed_30d",
+            "n_ed_90d",
+            "n_ed_365d",
+            "n_hosp_30d",
+            "n_hosp_90d",
+            "n_hosp_365d",
+            "n_icu_30d",
+            "n_icu_90d",
+            "n_icu_365d",
+            "triage_temperature",
+            "triage_heartrate",
+            "triage_resprate",
+            "triage_o2sat",
+            "triage_sbp",
+            "triage_dbp",
+            "triage_pain",
+            "triage_acuity",
+            "chiefcom_chest_pain",
+            "chiefcom_abdominal_pain",
+            "chiefcom_headache",
+            "chiefcom_shortness_of_breath",
+            "chiefcom_back_pain",
+            "chiefcom_cough",
+            "chiefcom_nausea_vomiting",
+            "chiefcom_fever_chills",
+            "chiefcom_syncope",
+            "chiefcom_dizziness",
+            "cci_MI",
+            "cci_CHF",
+            "cci_PVD",
+            "cci_Stroke",
+            "cci_Dementia",
+            "cci_Pulmonary",
+            "cci_Rheumatic",
+            "cci_PUD",
+            "cci_Liver1",
+            "cci_DM1",
+            "cci_DM2",
+            "cci_Paralysis",
+            "cci_Renal",
+            "cci_Cancer1",
+            "cci_Liver2",
+            "cci_Cancer2",
+            "cci_HIV",
+            "eci_Arrhythmia",
+            "eci_Valvular",
+            "eci_PHTN",
+            "eci_HTN1",
+            "eci_HTN2",
+            "eci_NeuroOther",
+            "eci_Hypothyroid",
+            "eci_Lymphoma",
+            "eci_Coagulopathy",
+            "eci_Obesity",
+            "eci_WeightLoss",
+            "eci_FluidsLytes",
+            "eci_BloodLoss",
+            "eci_Anemia",
+            "eci_Alcohol",
+            "eci_Drugs",
+            "eci_Psychoses",
+            "eci_Depression",
+        ]
+
+    def __len__(self):
+        """Returns the length of the dataset"""
+        return len(self.dataframe)
+
+    def __get_all_inputs__(self):
+        """Returns all inputs in the dataset"""
+        inputs = self.dataframe[self.input_variables].copy()
+        inputs = np.array(inputs, dtype=np.float32)
+        return inputs
+
+    def __get_all_targets__(self):
+        """Returns all targets in the dataset"""
+        targets = self.dataframe["outcome_hospitalization"]
+        targets = np.array(targets, dtype=np.float16)
+        return targets[..., None]
+
+    def __getitem__(self, index: int) -> tuple:
+        raise NotImplementedError(
+            "MIMIC-IV dataset does not support __getitem__ method. Use __get_all_inputs__ and __get_all_targets__ instead."
+        )

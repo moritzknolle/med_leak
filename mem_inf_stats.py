@@ -42,10 +42,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/fitzpatrick/", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/ptb-xl/resnet1d_128", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "fitzpatrick",
+    "ptb-xl",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -145,6 +145,8 @@ def get_data_root(dataset_name: str):
         data_root = Path("/home/moritz/data_huge/embed_small/processed_512x512")
     elif dataset_name == "fitzpatrick":
         data_root = Path("/home/moritz/data/fitzpatrick17k")
+    elif dataset_name == "ptb-xl":
+        data_root = Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/")
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
     return data_root
