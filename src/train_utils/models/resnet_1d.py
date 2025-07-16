@@ -1,6 +1,6 @@
 # implemented as described in Wang et al., "Time Series Classification from Scratch with Deep Neural Networks: A Strong Baseline", Data Mining and Knowledge Discovery, 2019
 
-import keras
+import keras # type: ignore
 from typing import Tuple
 
 

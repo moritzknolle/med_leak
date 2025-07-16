@@ -5,9 +5,9 @@ from pathlib import Path
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
 
-import keras
-import numpy as np
-from absl import app, flags
+import keras # type: ignore
+import numpy as np 
+from absl import app, flags # type: ignore
 
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model

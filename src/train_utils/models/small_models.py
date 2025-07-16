@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Tuple
 
-import keras
+import keras # type: ignore
 
 
 def get_small_cnn(

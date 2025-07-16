@@ -5,11 +5,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Tuple
 
-import keras
+import keras # type: ignore
 import numpy as np
-import pandas as pd
-from PIL import Image
-from tqdm import tqdm
+import pandas as pd # type: ignore
+from PIL import Image # type: ignore
+from tqdm import tqdm # type: ignore
 
 from .constants import (
     CXR_LABELS,

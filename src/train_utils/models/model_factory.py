@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Callable, Optional, Tuple
 
-import keras
+import keras # type: ignore
 
 from .small_models import get_small_cnn
 from .vit.vision_transformer import vit_b8, vit_b16, vit_b32, vit_l16, vit_l32
@@ -106,12 +106,13 @@ def get_model(
         nb_feature_maps = int(model_name.split("_")[1]) if len(model_name.split("_")) > 1 else 64
         model = build_1d_resnet(nb_classes=num_classes, input_shape=(1_000, in_channels), nb_feature_maps=nb_feature_maps)
     elif model_name.split("_")[0] == "tabresnet":
-        _, width, n_blocks = model_name.split("_")
-        width = int(width)
-        n_blocks_int = int(n_blocks)
+        assert len(model_name.split("_")) == 3, f"Invalid model name {model_name}, expected format 'tabresnet_[width]_[n_blocks]'"
+        parts = model_name.split("_")
+        width_int = int(parts[1])
+        n_blocks_int = int(parts[2])
         model = build_tabular_resnet(
             input_shape=(in_channels,),
-            width=width,
+            width=width_int,
             depth=n_blocks_int,
             dropout_rate=dropout,
             num_classes=num_classes,

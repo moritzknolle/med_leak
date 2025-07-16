@@ -6,11 +6,11 @@ import time
 from pathlib import Path
 from typing import Callable, Tuple, Optional
 
-import keras
+import keras # type: ignore
 import numpy as np
-import tensorflow as tf
-from absl import flags
-import pandas as pd
+import tensorflow as tf # type: ignore
+from absl import flags # type: ignore
+import pandas as pd # type: ignore
 
 import wandb
 
@@ -149,12 +149,12 @@ def train_and_eval(
     keras.utils.set_random_seed(seed)
     print(f"... starting training using keras backend: {keras.backend.backend()}")
     if keras.backend.backend() == "jax":
-        import jax
+        import jax # type: ignore
         jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
     if log_wandb:
         if wandb_project_name == "":
             raise ValueError("Must provide a valid wandb project name")
-        wandb.init(project=f"{wandb_project_name}")
+        wandb.init(project=f"{wandb_project_name}") 
         wandb.config.update(flags.FLAGS)
         wandb.config.update({"run_seed": seed})
         wandb.config.update({"epochs": epochs})
@@ -551,7 +551,7 @@ def train_random_subset(
                     fcntl.flock(f2, fcntl.LOCK_UN)
                     pickle.dump(completed_idcs, f2)
     if keras.backend.backend() == "jax":
-        import jax
+        import jax # type: ignore
         jax.clear_caches() # this is important to prevent memory fragmentation which can otherwise slow down the next run
-        time.sleep(10)  # give some time for the backend to clear
+        time.sleep(10)  # allow some time for the backend to clear
     wandb.run.finish()

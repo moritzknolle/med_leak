@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import pandas as pd # type: ignore
 from typing import Tuple
 
 from src.data_utils.datasets import (CXRDataset, EMBEDataset,
