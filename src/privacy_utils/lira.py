@@ -156,6 +156,46 @@ def loss_logit_transform_multilabel(
     return logit_score
 
 
+def loss_logit_transform_binary(
+    logits: np.ndarray,
+    labels: np.ndarray,
+    eps: float = 1e-45,
+    is_mimic_or_chexpert: bool = False,
+):
+    """
+    Numerically stable implementation of logit transform applied to model confidence (sigmoid probability output):
+    logit(p) = log(p / (1 - p))
+             = log(p) - log(1 - p)
+    See LiRA paper for details.
+    Args:
+        logits: A numpy array of shape (samples, n_augs, N_classes) representing the raw model outputs
+        labels: A numpy array of shape (samples, N_classes), one-hot or multi-hot encoded.
+        is_mimic_or_chexpert: A boolean indicating whether the dataset is MIMIC-CXR or CheXpert.
+    Returns:
+        A numpy array of shape (samples,) containing the logit transformed confidence scores."""
+    # repeat labels such that they match the shape of the logits (over augmentations of the same record)
+    if len(logits.shape) > 2:
+        labels = labels[:, None, :]
+        labels = np.repeat(labels, logits.shape[1], axis=1)
+    assert (
+        logits.shape == labels.shape
+    ), f"Shapes do not match: {logits.shape} vs {labels.shape}"
+    # softmax transformation
+    preds = keras.activations.sigmoid(logits)
+    y_true = np.sum(
+        preds * labels, axis=-1
+    )  # set wrong class probabilities to 0 and sum over the rest (only in the multilabel setting will there be multiple correct classes)
+    y_wrong = np.sum(
+        preds * np.logical_not(labels), axis=-1
+    )  # set the true class probabilities to 0 and sum over the rest
+    assert (
+        y_wrong.shape == y_true.shape
+    ), f"Shapes do not match: {y_wrong.shape} vs {y_true.shape}"
+    # numerically stable logit transform
+    logit_score = np.log(y_true + eps) - np.log(y_wrong + eps)
+    return logit_score[..., None]
+
+
 def perform_offline_lira(
     train_scores: np.ndarray,
     train_masks: np.ndarray,
@@ -439,6 +479,7 @@ def record_MIA_ROC_analysis(
         / (in_scores.shape[0] * out_scores.shape[0])
     )
     print(f"Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
+    print(f"Distribution Summary: /n/t mu={np.mean(aucs):.3g}, std={np.std(aucs):.3g}, min={np.min(aucs):.3g}, max={np.max(aucs):.3g}, 90%ile={np.percentile(aucs, 90):.3g}, 95%ile={np.percentile(aucs, 95):.3g}, 99%ile={np.percentile(aucs, 99):.3g}")
     assert (
         np.count_nonzero(np.isnan(aucs)) == 0
     ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}, mean={np.nanmean(aucs)}, std={np.nanstd(aucs)}, min={np.nanmin(aucs)}, max={np.nanmax(aucs)}"

@@ -12,7 +12,6 @@ from keras.optimizers.schedules import LearningRateSchedule
 
 import wandb
 
-
 class LabelType(Enum):
     """Enum for label types."""
 
@@ -75,12 +74,11 @@ def stateless_random_rotate(img: tf.Tensor, seed: tf.Tensor, max_degrees=10):
     transform = tf.expand_dims(transform, 0)
     expanded_image = tf.expand_dims(img, 0)
     output_shape = tf.shape(img)[:2]
-
     rotated_image = tf.raw_ops.ImageProjectiveTransformV2(
         images=expanded_image,
         transforms=transform,
         output_shape=output_shape,
-        fill_mode="REFLECT",
+        fill_mode="CONSTANT",
         interpolation="BILINEAR",
     )
     return tf.squeeze(rotated_image, axis=0)
@@ -161,6 +159,12 @@ def get_aug_fn(aug_strength: str):
             stateless_random_rotate,
             partial(tf.image.stateless_random_contrast, lower=0.0, upper=1.0),
             partial(tf.image.stateless_random_brightness, max_delta=0.25),
+        ]
+    elif aug_strength == "diffusion":
+        augs = [
+        partial(stateless_random_rotate, max_degrees=5),
+        partial(tf.image.stateless_random_contrast, lower=0.0, upper=0.5),
+        partial(tf.image.stateless_random_brightness, max_delta=0.1),
         ]
     elif aug_strength == "rotate":
         augs = [stateless_random_rotate]

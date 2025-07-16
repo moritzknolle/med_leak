@@ -55,11 +55,6 @@ flags.DEFINE_boolean(
     True,
     "Whether to perform mixed precision training to reduce training time.",
 )
-flags.DEFINE_boolean(
-    "full_train_dataset",
-    False,
-    "Whether to use the full training dataset (Not the random subset otherwise used for leave-many-out re-training). This only has an effect when --eval_only is set to True.",
-)
 flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
     "n_runs", 200, "Number of leave-many-out re-training runs to perform."
@@ -88,9 +83,9 @@ def main(argv):
         keras.mixed_precision.set_global_policy("mixed_float16")
     NUM_CLASSES = 5
     base_path = "/home/moritz/data_fast/npy/ptb-xl/ptb-xl"
-    (x_train, y_train), (x_test, y_test) = get_dataset(
+    train_dataset, test_dataset = get_dataset(
         dataset_name="ptb-xl",
-        img_size=0,
+        img_size=(0,0),
         csv_root=Path("./data/csv"),
         data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
         save_root=Path(FLAGS.save_root),
@@ -98,12 +93,12 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=True,
     )
-    print(x_train.shape, y_train.shape)
-    print(x_test.shape, y_test.shape)
 
-    STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
-    if not FLAGS.full_train_dataset:
-        STEPS = int(STEPS * FLAGS.subset_ratio)
+    # calculate number of steps (for cosine lr decay)
+    if FLAGS.eval_only:
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+    else:
+        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
 
     def get_compiled_model():
         # create model, lr schedule and optimizer
@@ -151,16 +146,10 @@ def main(argv):
 
     model = get_compiled_model()
     if FLAGS.eval_only:
-        if not FLAGS.full_train_dataset:
-            # randomly select 50% of the training data
-            mask = np.random.binomial(1, 0.5, size=len(x_train)).astype(bool)
-            subset_idcs = np.where(mask)[0]
-            x_train = x_train[subset_idcs]
-            y_train = y_train[subset_idcs]
         _, _, _, _ = train_and_eval(
             compiled_model=model,
-            train_dataset=(x_train, y_train),
-            test_dataset=(x_test, y_test),
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
             batch_size=FLAGS.batch_size,
             aug_fn=get_aug_fn(FLAGS.augment),
             augment=True if FLAGS.augment != "None" else False,
@@ -176,8 +165,8 @@ def main(argv):
             try:
                 train_random_subset(
                     compiled_model=model,
-                    train_dataset=(x_train, y_train),
-                    test_dataset=(x_test, y_test),
+                    train_dataset=train_dataset,
+                    test_dataset=test_dataset,
                     batch_size=FLAGS.batch_size,
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,

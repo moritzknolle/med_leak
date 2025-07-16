@@ -13,4 +13,8 @@ def get_dataset_str(dataset: str):
         return "EMBED"
     elif dataset == "fairvision":
         return "FairVision"
+    elif dataset == "ptb-xl":
+        return "PTB-XL"
+    elif dataset == "mimic-iv-ed":
+        return "MIMIC-IV-ED"
     raise ValueError(f"Invalid dataset name., {dataset}")

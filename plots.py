@@ -10,7 +10,7 @@ import seaborn as sns
 import pandas as pd
 
 from src.colors import (chex_color, embed_color, fairvision_color,
-                              fitz_color, mimic_color)
+                              fitz_color, mimic_color, ptb_xl_color, mimic_iv_ed_color)
 from src.privacy_utils.plot_utils import mia_auc_esf_plot
 
 FONT_SIZE = 7
@@ -35,9 +35,11 @@ FIGDIRS = {
     "fitzpatrick": "./figs/fitzpatrick",
     "fairvision": "./figs/fairvision",
     "embed": "./figs/embed",
+    "ptb-xl": "./figs/ptb-xl",
+    "mimic-iv-ed": "./figs/mimic-iv-ed",
 }
 FLAGS = flags.FLAGS
-flags.DEFINE_string("mia_method", "rmia", "MIA method to use. One of ['rmia', 'lira'].")
+flags.DEFINE_string("mia_method", "lira", "MIA method to use. One of ['rmia', 'lira'].")
 flags.DEFINE_boolean("log_scale", False, "Whether to plot ROC curves in log scale.")
 
 
@@ -52,8 +54,13 @@ def get_color(dataset_name):
         return fairvision_color
     elif dataset_name == "embed":
         return embed_color
+    elif dataset_name == "ptb-xl":
+        return ptb_xl_color
+    elif dataset_name == "mimic-iv-ed":
+        return mimic_iv_ed_color
     else:
         raise ValueError(f"Unknown dataset name {dataset_name}.")
+
 
 
 def get_dataset_name(dataset_name):
@@ -67,6 +74,10 @@ def get_dataset_name(dataset_name):
         return "FairVision"
     elif dataset_name == "embed":
         return "EMBED"
+    elif dataset_name == "ptb-xl":
+        return "PTB-XL"
+    elif dataset_name == "mimic-iv-ed":
+        return "MIMIC-IV ED"
     else:
         raise ValueError(f"Unknown dataset name {dataset_name}.")
 
@@ -145,7 +156,7 @@ def main(argv):
     ax.set_yscale("log")
     ax.set_xlabel("MIA AUC (Patient-level)")
     ax.set_ylabel("1 - Cumulative Probability")
-    # fig.legend(bbox_to_anchor=(0.5, -0.15), loc="lower center", ncol=3)
+    #fig.legend(bbox_to_anchor=(0.5, -0.15), loc="lower center", ncol=3)
     plt.savefig(f"./figs/patient_level_MIA_AUC_eSFs.pdf", bbox_inches="tight")
     # patient-level ROC analysis (mean)
     n_max = 0
@@ -230,7 +241,7 @@ def main(argv):
     ax.spines[['right', 'top']].set_visible(False)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     ax.set_xlabel("")
-    ax.set_ylim((0.5, 0.6))
+    ax.set_ylim((0.49, 0.6))
     ax.set_ylabel("Aggregate Attack AUC")
     ax.legend(loc='upper right', ncols=1)
     plt.savefig(f"./figs/agg_auc_comparison.pdf", bbox_inches="tight")

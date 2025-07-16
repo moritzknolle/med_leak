@@ -43,16 +43,11 @@ flags.DEFINE_enum(
     ["trivial", "weak", "medium", "strong", "none"],
     "What type of data augmentations strength to apply.",
 )
-flags.DEFINE_integer("img_size", 64, "Image size.")
+flags.DEFINE_list("img_size", [64, 64], "Image size.")
 flags.DEFINE_boolean(
     "mixed_precision",
     True,
     "Whether to perform mixed precision training to reduce training time.",
-)
-flags.DEFINE_boolean(
-    "full_train_dataset",
-    False,
-    "Whether to use the full training dataset (Not the random subset otherwise used for leave-many-out re-training). This only has an effect when --eval_only is set to True.",
 )
 flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
@@ -81,10 +76,10 @@ def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
     NUM_CLASSES = 14
-
-    (x_train, y_train), (x_test, y_test) = get_dataset(
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
+    train_dataset, test_dataset = get_dataset(
         dataset_name="chexpert",
-        img_size=FLAGS.img_size,
+        img_size=IMG_SIZE,
         csv_root=Path("./data/csv"),
         data_root=Path("/home/moritz/data/chexpert/CheXpert-v1.0"),
         save_root=Path(FLAGS.save_root),
@@ -95,10 +90,11 @@ def main(argv):
     imagenet_weights = (
         FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
     )
-
-    STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
-    if not FLAGS.full_train_dataset:
-        STEPS = int(STEPS * FLAGS.subset_ratio)
+    # calculate number of steps (for cosine lr decay)
+    if FLAGS.eval_only:
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+    else:
+        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
 
     def get_compiled_model():
         preprocess_fn = grayscale_to_rgb if imagenet_weights else None
@@ -106,7 +102,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=FLAGS.img_size,
+            img_size=IMG_SIZE,
             in_channels=1,
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
@@ -158,16 +154,10 @@ def main(argv):
 
     model = get_compiled_model()
     if FLAGS.eval_only:
-        if not FLAGS.full_train_dataset:
-            # randomly select 50% of the training data
-            mask = np.random.binomial(1, 0.5, size=len(x_train)).astype(bool)
-            subset_idcs = np.where(mask)[0]
-            x_train = x_train[subset_idcs]
-            y_train = y_train[subset_idcs]
         _, _, _, _ = train_and_eval(
             compiled_model=model,
-            train_dataset=(x_train, y_train),
-            test_dataset=(x_test, y_test),
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
             batch_size=FLAGS.batch_size,
             aug_fn=get_aug_fn(FLAGS.augment),
             augment=True if FLAGS.augment != "None" else False,
@@ -183,8 +173,9 @@ def main(argv):
             try:
                 train_random_subset(
                     compiled_model=model,
-                    train_dataset=(x_train, y_train),
-                    test_dataset=(x_test, y_test),
+                    train_dataset=train_dataset,
+                    test_dataset=test_dataset,
+                    patient_id_col="patient_id",
                     batch_size=FLAGS.batch_size,
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,

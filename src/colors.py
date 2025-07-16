@@ -35,5 +35,8 @@ FITZPATRICK_COLORS = {
 chex_color = "#344966"
 mimic_color = "#8d91c7"
 fitz_color = "#d64933"
-fairvision_color = "purple"
-embed_color = "orange"
+fairvision_color = "#800080"
+embed_color = "#FFA500"
+ptb_xl_color = "#3a3e3b"
+mimic_iv_ed_color = "#AEC3B0"
+

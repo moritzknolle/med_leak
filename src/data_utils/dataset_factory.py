@@ -2,25 +2,27 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from typing import Tuple
 
 from src.data_utils.datasets import (CXRDataset, EMBEDataset,
                                            FairVisionDataset,
                                            FitzPatLabelSetting,
                                            FitzpatrickDataset,
                                            PTBXLDataset,
-                                           MIMICIVEDDataset)
+                                           MIMICIVEDDataset,
+                                           BaseDataset)
 
 
 def get_dataset(
     dataset_name: str,
-    img_size: int,
+    img_size: Tuple[int, int],
     csv_root: Path,
     data_root: Path,
     save_root: Path,
     get_numpy: bool = False,
     load_from_disk: bool = False,
     overwrite_existing: bool = False,
-):
+) -> Tuple[BaseDataset, BaseDataset]: 
     """
     Convenience function to retrieve a dataset by name. Raises a ValueError if the dataset is unknown.
         Args:
@@ -41,7 +43,6 @@ def get_dataset(
         )
         cxp_df = pd.read_csv(cxp_df_path)
         cxp_test_df = pd.read_csv(csv_root / "chexpert_test.csv")
-        use_memmap = img_size > 128
         train_dataset = CXRDataset(
             df=cxp_df,
             img_path=data_root,
@@ -49,7 +50,6 @@ def get_dataset(
             img_size=img_size,
             split="train",
             save_root=save_root,
-            memmap=use_memmap,
         )
         test_dataset = CXRDataset(
             df=cxp_test_df,
@@ -64,7 +64,6 @@ def get_dataset(
             csv_root / "mimic_train.csv"
         )
         mimic_df = pd.read_csv(csv_path)
-        use_memmap = img_size > 128
         train_dataset = CXRDataset(
             df=mimic_df,
             img_path=data_root / "files",
@@ -72,7 +71,6 @@ def get_dataset(
             img_size=img_size,
             split="train",
             save_root=save_root,
-            memmap=use_memmap,
         )
         # use CheXpert test set since labels are verified by experts (consensus voting of three board-certified radiologists)
         cxp_test_df = pd.read_csv(csv_root / "chexpert_test.csv")
@@ -115,7 +113,6 @@ def get_dataset(
             embed_df[embed_df.split == "train"],
             embed_df[embed_df.split == "test"],
         )
-        use_memmap = img_size > 128
         train_dataset = EMBEDataset(
             df=train_df,
             img_path=data_root,
@@ -123,7 +120,6 @@ def get_dataset(
             img_size=img_size,
             split="train",
             save_root=save_root,
-            memmap=use_memmap,
         )
         test_dataset = EMBEDataset(
             df=test_df,
@@ -132,7 +128,6 @@ def get_dataset(
             img_size=img_size,
             split="test",
             save_root=save_root,
-            memmap=use_memmap,
         )
     elif dataset_name == "fairvision":
         fairvision_df = pd.read_csv(csv_root / "fairvision.csv")
@@ -182,34 +177,34 @@ def get_dataset(
         test_dataset = MIMICIVEDDataset(
             dataframe=test_df
         )
-        # MIMICIVEDDataset does not support iterative loading of data, so we return the full data directly
+        # the MIMIC-IV-ED Dataset does not support iterative loading of data, so we return the full data directly
         if get_numpy:
-            x_train, y_train = train_dataset.__get_all_inputs__(), train_dataset.__get_all_targets__()
-            x_test, y_test = test_dataset.__get_all_inputs__(), test_dataset.__get_all_targets__()
-            return (x_train, y_train), (x_test, y_test)
+            train_dataset.inputs = train_dataset.__get_all_inputs__()
+            train_dataset.targets = train_dataset.__get_all_targets__()
+            test_dataset.inputs = test_dataset.__get_all_inputs__()
+            test_dataset.targets = test_dataset.__get_all_targets__()
+            return train_dataset, test_dataset
     else:
         raise ValueError(f"Unknown dataset {dataset_name}")
     if get_numpy:
         # extract np.arrays
-        print("... building numpy arrays")
-        x_train, y_train = train_dataset.get_numpy(
+        print("... caching data into memory")
+        train_dataset.cache_numpy(
             load_from_disk=load_from_disk, overwrite_existing=overwrite_existing
         )
-        x_test, y_test = test_dataset.get_numpy(
+        test_dataset.cache_numpy(
             load_from_disk=load_from_disk, overwrite_existing=overwrite_existing
         )
         # add channel dimension if necessary
-        if len(x_train.shape) == 3 and x_train.shape[1]==x_train.shape[2]:
-            x_train = np.expand_dims(x_train, axis=-1)
-            x_test = np.expand_dims(x_test, axis=-1)
+        if len(train_dataset.inputs.shape) == 3 and train_dataset.inputs.shape[1]==train_dataset.inputs.shape[2]:
+            train_dataset.inputs = np.expand_dims(train_dataset.inputs, axis=-1)
+            test_dataset.inputs = np.expand_dims(test_dataset.inputs, axis=-1)
         # convert to channels last if necessary
-        if not x_train.shape[-1] in [1, 3, 12]:
-            x_train = np.transpose(x_train, (0, 2, 3, 1))
-            x_test = np.transpose(x_test, (0, 2, 3, 1))
+        if not train_dataset.inputs.shape[-1] in [1, 3, 12]:
+            train_dataset.inputs = np.transpose(train_dataset.inputs, (0, 2, 3, 1))
+            test_dataset.inputs = np.transpose(test_dataset.inputs, (0, 2, 3, 1))
         # shape checks
-        assert x_train.shape[0] == y_train.shape[0]
-        assert x_test.shape[0] == y_test.shape[0]
-        assert x_train.shape[1:] == x_test.shape[1:]
-        print("... done building numpy arrays")
-        return (x_train, y_train), (x_test, y_test)
+        assert train_dataset.inputs.shape[0] == train_dataset.targets.shape[0]
+        assert test_dataset.inputs.shape[0] == test_dataset.targets.shape[0]
+        assert train_dataset.inputs.shape[1:] == test_dataset.inputs.shape[1:]
     return train_dataset, test_dataset

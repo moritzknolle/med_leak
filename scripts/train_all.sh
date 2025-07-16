@@ -10,6 +10,7 @@ python embed.py --eval_only=False --n_runs=200 --logdir="./logs/embed/wrn_28_2"
 python fairvision.py --eval_only=False --n_runs=200 --logdir="./logs/fairvision/wrn_28_2"
 python fitzpatrick.py --eval_only=False --n_runs=200 --logdir="./logs/fitzpatrick/wrn_28_2"
 
+
 # model scaling experiments
 python chexpert.py --eval_only=False --n_runs=200 --model='small_cnn' --logdir="./logs/chexpert/small_cnn"
 python chexpert.py --eval_only=False --n_runs=200 --model='wrn_28_5' --logdir="./logs/chexpert/wrn_28_5"

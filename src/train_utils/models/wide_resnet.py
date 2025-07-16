@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import keras
 
@@ -85,7 +85,7 @@ class WRNBlock(keras.layers.Layer):
 def get_wrn_general(
     in_channels: int,
     num_classes: int,
-    img_size: int,
+    img_size: Tuple[int,int],
     blocks_per_group: List[int],
     width: int,
     norm: Callable = partial(
@@ -110,7 +110,7 @@ def get_wrn_general(
         int(v * width) for v in [16 * (2**i) for i in range(len(blocks_per_group))]
     ]
     n = 16
-    inputs = keras.Input(shape=(img_size, img_size, in_channels))
+    inputs = keras.Input(shape=(img_size[0], img_size[1], in_channels))
     x = inputs
     x = keras.layers.Conv2D(filters=n, kernel_size=3, **conv_args(3, n))(x)
     for i, (block, width) in enumerate(zip(blocks_per_group, widths)):
@@ -134,7 +134,7 @@ def get_wrn_general(
 
 
 def get_wide_resnet(
-    img_size: int = 32,
+    img_size: Tuple[int,int] = (32, 32),
     in_channels: int = 3,
     num_classes: int = 10,
     depth: int = 28,
@@ -163,7 +163,7 @@ def get_wide_resnet(
     blocks_per_group = [n] * 3
     if act not in ["leaky_relu", "relu"]:
         raise ValueError(f"Activation {act} not found")
-    act = (
+    act_fn = (
         keras.layers.LeakyReLU(negative_slope=0.1)
         if act == "leaky_relu"
         else keras.activations.relu
@@ -175,6 +175,6 @@ def get_wide_resnet(
         blocks_per_group=blocks_per_group,
         width=width,
         norm=norm,
-        act=act,
+        act=act_fn,
         dropout=dropout,
     )

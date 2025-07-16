@@ -12,11 +12,12 @@ from tqdm import tqdm
 from ..train_utils.utils import LabelType
 
 
-def rmia_transform_multiclass(
+def rmia_transform(
     logits: np.ndarray,
     labels: np.ndarray,
     temperature: float = 1.0,
     is_mimic_or_chexpert=False,
+    is_binary: bool = False,
 ):
     """
     Apply the softmax activation function on the logits and return the probabilities for the true class. In Zarifzadeh et al. paper the authors try different softmax computations
@@ -47,9 +48,13 @@ def rmia_transform_multiclass(
     ), f"Shapes do not match: {logits.shape} vs {labels.shape}"
     if temperature != 1.0:
         logits /= temperature
-    preds = keras.activations.softmax(logits, axis=-1)
-    # extract the probabilities for the true class
-    scores = np.sum(preds * labels, axis=-1)
+    if is_binary:
+        preds = keras.activations.sigmoid(logits)
+        scores = preds
+    else:
+        preds = keras.activations.softmax(logits, axis=-1)
+        # extract the probabilities for the true class
+        scores = np.sum(preds * labels, axis=-1)
     assert (
         scores.shape[0] == logits.shape[0]
     ), f"Expected scores to have shape {logits.shape[0]}, but got {scores.shape[0]}"
@@ -114,6 +119,7 @@ def perform_rmia(
         mia_preds, mia_targets: numpy arrays containing the MIA predictions and targets
     """
     n_target_records = test_scores.shape[1]
+    print(train_scores.shape, train_masks.shape, test_scores.shape, test_masks.shape)
     if pop_indices is None:
         sample_ratio = 5 * n_pop / n_target_records
         print(
@@ -143,8 +149,10 @@ def perform_rmia(
         assert (
             test_scores.shape[0] == test_masks.shape[0]
         ), f"Shapes do not match: {test_scores.shape} vs {test_masks.shape}"
-    train_scores = np.mean(train_scores, axis=-1)
-    test_scores = np.mean(test_scores, axis=-1)
+    # average over augmentations if present
+    if len(train_scores.shape) > 2:
+        train_scores = np.mean(train_scores, axis=-1)
+        test_scores = np.mean(test_scores, axis=-1)
 
     dat_in, dat_out = [], []
     for j in range(train_scores.shape[1]):
@@ -275,6 +283,7 @@ def get_preds_rmia(
     pr_z: np.ndarray,
     indices: np.ndarray,
     gamma: float,
+    epsilon: float = 1e-10,
 ):
     """
     Compute RMIA predictions for the given test scores and population data.
@@ -299,8 +308,8 @@ def get_preds_rmia(
     assert (
         indices.max() != 1
     ), f"Expected indices to contain indices, but got one-hot {indices}"
-    ratio_x = test_scores / pr_x
-    ratio_z = 1 / (test_scores / pr_z)
+    ratio_x = test_scores / (pr_x + epsilon)
+    ratio_z = 1 / ((test_scores / (pr_z+ epsilon)) + epsilon)
     scores = outer_product_at_indices(
         vector_a=ratio_x, vector_b=ratio_z, indices=indices
     )

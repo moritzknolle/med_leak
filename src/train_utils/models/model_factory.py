@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import keras
 
@@ -11,7 +11,7 @@ from .resnet_1d import build_1d_resnet, build_tabular_resnet
 
 def get_model(
     model_name: str,
-    img_size: int,
+    img_size: Tuple[int, int],
     in_channels: int,
     num_classes: int,
     dropout=0.0,
@@ -50,7 +50,7 @@ def get_model(
         backbone = keras.applications.ResNet50(
             weights=None,
             include_top=False,
-            input_shape=(img_size, img_size, in_channels),
+            input_shape=(img_size[0], img_size[1], in_channels),
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -64,7 +64,7 @@ def get_model(
         backbone = keras.applications.ResNet50(
             weights="imagenet",
             include_top=False,
-            input_shape=(img_size, img_size, 3),
+            input_shape=(img_size[0], img_size[1], 3),
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -78,7 +78,7 @@ def get_model(
         backbone = keras.applications.DenseNet121(
             weights=None,
             include_top=False,
-            input_shape=(img_size, img_size, in_channels),
+            input_shape=(img_size[0], img_size[1], in_channels),
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -92,7 +92,7 @@ def get_model(
         backbone = keras.applications.DenseNet121(
             weights="imagenet",
             include_top=False,
-            input_shape=(img_size, img_size, 3),
+            input_shape=(img_size[0], img_size[1], 3),
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -108,11 +108,11 @@ def get_model(
     elif model_name.split("_")[0] == "tabresnet":
         _, width, n_blocks = model_name.split("_")
         width = int(width)
-        n_blocks = int(n_blocks)
+        n_blocks_int = int(n_blocks)
         model = build_tabular_resnet(
             input_shape=(in_channels,),
             width=width,
-            depth=n_blocks,
+            depth=n_blocks_int,
             dropout_rate=dropout,
             num_classes=num_classes,
         )
@@ -181,7 +181,7 @@ def get_model(
     if preprocessing_func is not None:
         final_model = keras.Sequential(
             [
-                keras.layers.Input(shape=(img_size, img_size, in_channels)),
+                keras.layers.Input(shape=(img_size[0], img_size[1], in_channels)),
                 keras.layers.Lambda(preprocessing_func, name="preprocessing"),
                 model,
             ]

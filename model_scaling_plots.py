@@ -11,7 +11,8 @@ from absl import app, flags
 from mem_inf_stats import get_patient_col
 from src.data_utils.dataset_factory import get_dataset
 from src.privacy_utils.common import aggregate_by_patient
-from src.privacy_utils.lira import (compute_scores, load_score,
+from src.privacy_utils.common import load_score
+from src.privacy_utils.lira import (compute_scores,
                                     loss_logit_transform_multiclass,
                                     loss_logit_transform_multilabel,
                                     perform_lira, record_MIA_ROC_analysis)
@@ -102,7 +103,6 @@ def main(argv):
         img_size=128,
         csv_root=Path(FLAGS.csv_root),
         save_root=Path(FLAGS.save_root),
-        one_image_per_patient=False,
         data_root=Path(""),
     )
     COLORS = CHEX_COLORS if FLAGS.dataset_name == "chexpert" else FITZ_COLORS

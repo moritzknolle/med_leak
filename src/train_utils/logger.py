@@ -93,7 +93,7 @@ class RetrainLogger:
         metrics: dict,
     ):
         """
-        Logs the training and evaluation data.
+        Logs the raw predictions on the training and test data.
 
         Args:
             train_logits (np.ndarray): The logits of the training data.
@@ -107,10 +107,7 @@ class RetrainLogger:
         """
         self.maybe_create_log_dir()
         self.end_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        assert len(train_logits) == len(train_labels) and len(train_logits) == len(
-            self.subset_mask
-        ), "train_logits, train_labels, and train_idcs must be the same length"
-        assert train_logits.shape[1] == eval_logits.shape[1], "train_logits and eval_logits must have the same number of evaluations"
+        assert len(train_logits) == len(train_labels), "Careful! Shape mismatch"
         try:
             np.save(self.log_dir / "train_logits.npy", train_logits)
             np.save(self.log_dir / "train_labels.npy", train_labels)

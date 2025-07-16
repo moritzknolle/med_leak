@@ -12,11 +12,12 @@ from src.data_utils.utils import get_dataset_str
 from src.privacy_utils.common import load_score
 from src.privacy_utils.lira import (compute_scores,
                                     loss_logit_transform_multiclass,
+                                    loss_logit_transform_binary,
                                     perform_lira, record_MIA_ROC_analysis)
 from src.privacy_utils.plot_utils import (disease_group_plots,
                                           mia_auc_esf_plot, plot_images,
                                           subgroup_plots)
-from src.privacy_utils.rmia import perform_rmia, rmia_transform_multiclass
+from src.privacy_utils.rmia import perform_rmia, rmia_transform
 from src.privacy_utils.utils import confidence_roc_plot
 from src.train_utils.utils import get_label_mode
 
@@ -42,10 +43,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/ptb-xl/resnet1d_128", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/mimic-iv-ed/resnet_300_6", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "ptb-xl",
+    "mimic-iv-ed",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -78,7 +79,7 @@ flags.DEFINE_bool(
 )
 flags.DEFINE_bool(
     "plot_images",
-    True,
+    False,
     "If set to True, plot some sample images most vulnerable records and randomly sample records.",
 )
 flags.DEFINE_bool(
@@ -129,6 +130,10 @@ def get_patient_col(dataset_name: str):
         patient_col = "empi_anon"
     elif dataset_name == "fitzpatrick":
         raise ValueError("Fitzpatrick does not have patient IDs.")
+    elif dataset_name == "ptb-xl":
+        patient_col = "patient_id"
+    elif dataset_name == "mimic-iv-ed":
+        patient_col = "subject_id"
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
     return patient_col
@@ -147,6 +152,8 @@ def get_data_root(dataset_name: str):
         data_root = Path("/home/moritz/data/fitzpatrick17k")
     elif dataset_name == "ptb-xl":
         data_root = Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/")
+    elif dataset_name == "mimic-iv-ed":
+        data_root = None
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
     return data_root
@@ -168,12 +175,13 @@ def main(argv):
     logdirs = [d for d in base_dir.iterdir()]
     label_mode = get_label_mode(FLAGS.label_mode)
     is_mimic_or_chex = FLAGS.dataset in ["mimic", "chexpert"]
+    is_binary = FLAGS.dataset=="mimic-iv-ed"
 
     logit_transform_func = partial(
-        loss_logit_transform_multiclass, is_mimic_or_chexpert=is_mimic_or_chex
+        loss_logit_transform_binary if is_binary else loss_logit_transform_multiclass, is_mimic_or_chexpert=is_mimic_or_chex
     )
     rmia_transform_func = partial(
-        rmia_transform_multiclass, is_mimic_or_chexpert=is_mimic_or_chex
+        rmia_transform, is_mimic_or_chexpert=is_mimic_or_chex, is_binary=is_binary
     )
     logit_load_func = partial(load_score, logit_transform_func=logit_transform_func)
     rmia_load_func = partial(load_score, logit_transform_func=rmia_transform_func)
@@ -189,6 +197,7 @@ def main(argv):
         multi_processing=FLAGS.multiprocessing,
         threads=FLAGS.threads,
     )
+    print(f"LiRA scores shape: {scores.shape}")
     if not FLAGS.patient_level_only:
         rmia_scores, rmia_masks, _ = compute_scores(
             log_dirs=logdirs,
@@ -197,6 +206,7 @@ def main(argv):
             threads=FLAGS.threads,
         )
         assert np.allclose(masks, rmia_masks), "Careful, masks do not match."
+        print(f"RMIA scores shape: {rmia_scores.shape}")
     assert scores.shape[1] == len(
         train_dataset
     ), f"Shape mismatch: {scores.shape} vs {len(train_dataset)}"

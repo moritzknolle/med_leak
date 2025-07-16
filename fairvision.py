@@ -12,8 +12,7 @@ from absl import app, flags
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
-from src.train_utils.utils import (LabelType, MyCosineDecay, get_aug_fn,
-                                   grayscale_to_rgb)
+from src.train_utils.utils import (MyCosineDecay, get_aug_fn)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
@@ -39,16 +38,11 @@ flags.DEFINE_enum(
     ["trivial", "weak", "medium", "strong", "none"],
     "What type of data augmentations strength to apply.",
 )
-flags.DEFINE_integer("img_size", 64, "Image size.")
+flags.DEFINE_list("img_size", [64, 64], "Image size.")
 flags.DEFINE_boolean(
     "mixed_precision",
     True,
     "Whether to perform mixed precision training to reduce training time.",
-)
-flags.DEFINE_boolean(
-    "full_train_dataset",
-    False,
-    "Whether to use the full training dataset (Not the random subset otherwise used for leave-many-out re-training). This only has an effect when --eval_only is set to True.",
 )
 flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
@@ -77,10 +71,10 @@ def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
     NUM_CLASSES = 7
-
-    (x_train, y_train), (x_test, y_test) = get_dataset(
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
+    train_dataset, test_dataset = get_dataset(
         dataset_name="fairvision",
-        img_size=FLAGS.img_size,
+        img_size=IMG_SIZE,
         csv_root=Path("./data/csv"),
         data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
         save_root=Path(FLAGS.save_root),
@@ -88,19 +82,18 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-    imagenet_weights = (
-        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-    )
 
-    STEPS = len(x_train) // FLAGS.batch_size * FLAGS.epochs
-    if not FLAGS.full_train_dataset:
-        STEPS = int(STEPS * FLAGS.subset_ratio)
+    # calculate number of steps (for cosine lr decay)
+    if FLAGS.eval_only:
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+    else:
+        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
 
     def get_compiled_model():
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=FLAGS.img_size,
+            img_size=IMG_SIZE,
             in_channels=1,
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
@@ -139,16 +132,10 @@ def main(argv):
 
     compiled_model = get_compiled_model()
     if FLAGS.eval_only:
-        if not FLAGS.full_train_dataset:
-            # randomly select 50% of the training data
-            mask = np.random.binomial(1, 0.5, size=len(x_train)).astype(bool)
-            subset_idcs = np.where(mask)[0]
-            x_train = x_train[subset_idcs]
-            y_train = y_train[subset_idcs]
         _, _, _, _ = train_and_eval(
             compiled_model=compiled_model,
-            train_dataset=(x_train, y_train),
-            test_dataset=(x_test, y_test),
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
             batch_size=FLAGS.batch_size,
             aug_fn=get_aug_fn(FLAGS.augment),
             augment=True if FLAGS.augment != "None" else False,
@@ -165,8 +152,8 @@ def main(argv):
                 compiled_model = get_compiled_model()
                 train_random_subset(
                     compiled_model=compiled_model,
-                    train_dataset=(x_train, y_train),
-                    test_dataset=(x_test, y_test),
+                    train_dataset=train_dataset,
+                    test_dataset=test_dataset,
                     batch_size=FLAGS.batch_size,
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,

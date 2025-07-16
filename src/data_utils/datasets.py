@@ -36,7 +36,6 @@ class BaseDataset:
         split (str): The split of the dataset (train, val, test)
         save_root (Path): The path to save the dataset
         n_threads (int): The number of threads to use for loading the dataset
-        memmap (bool): Whether to use memmap for loading the dataset
 
 
     """
@@ -48,11 +47,10 @@ class BaseDataset:
         name: str,
         num_classes: int,
         in_channels: int,
-        img_size: int,
+        img_size: Tuple[int, int],
         split: str,
         save_root: Path,
         n_threads: int = 32,
-        memmap: bool = False,
     ):
         print(f"... Creating {name} dataset")
         super().__init__()
@@ -64,10 +62,9 @@ class BaseDataset:
         self.split = split
         self.in_channels = in_channels
         self.img_size = img_size
-        self.filename = f"{name}_{split}_{self.img_size}x{self.img_size}"
+        self.filename = f"{name}_{split}_{self.img_size[0]}x{self.img_size[1]}"
         self.n_threads = n_threads
         self.save_root.mkdir(parents=True, exist_ok=True)
-        self.memmap = memmap
         if not isinstance(self.img_path, Path):
             self.img_path = Path(self.img_path)
         if not self.img_path.exists():
@@ -94,59 +91,32 @@ class BaseDataset:
         convenience_target_fn_exists = callable(
             getattr(self, "__get_all_targets__", None)
         )
-        if not self.memmap:
-            with mp.Pool(self.n_threads) as pool:
-                inputs = list(
+        with mp.Pool(self.n_threads) as pool:
+            inputs = list(
+                tqdm(
+                    pool.imap(
+                        self.__getinput__, range(self.__len__()), chunksize=32
+                    ),
+                    desc="Loading inputs",
+                    total=self.__len__(),
+                )
+            )
+            if not convenience_target_fn_exists:
+                targets = list(
                     tqdm(
                         pool.imap(
-                            self.__getinput__, range(self.__len__()), chunksize=32
+                            self.__gettarget__, range(self.__len__()), chunksize=32
                         ),
-                        desc="Loading inputs",
+                        desc="Loading targets",
                         total=self.__len__(),
                     )
                 )
-                if not convenience_target_fn_exists:
-                    targets = list(
-                        tqdm(
-                            pool.imap(
-                                self.__gettarget__, range(self.__len__()), chunksize=32
-                            ),
-                            desc="Loading targets",
-                            total=self.__len__(),
-                        )
-                    )
-                    self.targets = np.array(targets, dtype=np.float32)
-                else:
-                    self.targets = self.__get_all_targets__()
-                self.inputs = np.array(inputs, dtype=np.float32)
-            success = True
-        else:
-            print("... creating memmap files")
-            self.inputs = np.memmap(
-                f"{self.save_root}/{self.filename}_inputs.mmp",
-                dtype=np.float32,
-                mode="w+",
-                shape=(self.__len__(), self.img_size, self.img_size, self.in_channels),
-            )
-            self.targets = np.memmap(
-                f"{self.save_root}/{self.filename}_targets.mmp",
-                dtype=np.float32,
-                mode="w+",
-                shape=(self.__len__(), self.num_classes),
-            )
-            if convenience_target_fn_exists:
-                targets = self.__get_all_targets__()
-            for i in tqdm(range(self.__len__()), desc="Loading data"):
-                self.inputs[i] = self.__getinput__(i)
-                self.targets[i] = (
-                    self.__gettarget__(i)
-                    if not convenience_target_fn_exists
-                    else targets[i]
-                )
-                self.inputs.flush()
-                self.targets.flush()
-            success = True
-
+                self.targets = np.array(targets, dtype=np.float32)
+            else:
+                self.targets = self.__get_all_targets__()
+            self.inputs = np.array(inputs, dtype=np.float32)
+        success = True
+        
         return success
 
     def __len__(self):
@@ -176,19 +146,17 @@ class BaseDataset:
         """Write a loaded dataset to disk (saves two .npz files and a metadata file)."""
         self._write_metadata()
         base_file_name = self.save_root / f"{self.filename}"
-        if not self.memmap:
-            # write npz files for input and target arrays
-            np.save(f"{base_file_name}_inputs", self.inputs)
-            np.save(f"{base_file_name}_targets", self.targets)
+        # write npy files for input and target arrays
+        np.save(f"{base_file_name}_inputs.npy", self.inputs)
+        np.save(f"{base_file_name}_targets.npy", self.targets)
 
     def _load_from_file(self) -> bool:
         """Loads dataset from disk (.npz files and the metadata file)."""
         success = False
         base_file_name = self.save_root / f"{self.filename}"
         metadata_file = Path(f"{base_file_name}.json")
-        file_end = ".npy" if not self.memmap else ".mmp"
-        input_file = Path(f"{base_file_name}_inputs{file_end}")
-        target_file = Path(f"{base_file_name}_targets{file_end}")
+        input_file = Path(f"{base_file_name}_inputs.npy")
+        target_file = Path(f"{base_file_name}_targets.npy")
         print(f"... looking for dataset at: {self.save_root}")
         print(f"... checking metadata file: {metadata_file}")
         if input_file.exists() and target_file.exists() and metadata_file.is_file():
@@ -197,17 +165,9 @@ class BaseDataset:
                 metadata = json.load(file)
                 input_shape = tuple(metadata["input_shape"])
                 target_shape = tuple(metadata["target_shape"])
-            # Read .npz files
-            if not self.memmap:
-                self.inputs = np.load(input_file)
-                self.targets = np.load(target_file)
-            else:
-                self.inputs = np.memmap(
-                    input_file, dtype=np.float32, mode="r", shape=input_shape
-                )
-                self.targets = np.memmap(
-                    target_file, dtype=np.float32, mode="r", shape=target_shape
-                )
+            # Read .npy files
+            self.inputs = np.load(input_file)
+            self.targets = np.load(target_file)
             assert (
                 input_shape == self.inputs.shape
             ), f"Input shape mismatch: {input_shape} vs. {self.inputs.shape}"
@@ -226,9 +186,9 @@ class BaseDataset:
             print("... succesfully loaded dataset from disk")
         return success
 
-    def get_numpy(
+    def cache_numpy(
         self, load_from_disk: bool = True, overwrite_existing: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> None:
         """Return the input and target arrays."""
         if load_from_disk:
             success = self._load_from_file()
@@ -241,7 +201,6 @@ class BaseDataset:
             self._write_arrays_to_disk()
             print("... sucessfully wrote dataset to disk")
         assert success, "loading dataset failed"
-        return self.inputs, self.targets
 
 
 class CXRDataset(BaseDataset):
@@ -250,10 +209,9 @@ class CXRDataset(BaseDataset):
         df: pd.DataFrame,
         img_path: Path,
         name: str,
-        img_size: int,
+        img_size: Tuple[int, int],
         split: str,
         save_root: Path,
-        memmap: bool = False,
         label_strategy: CXRLabelStrategy = CXRLabelStrategy.UNCERTAIN_ONES,
         frontal_only=False,
     ):
@@ -277,7 +235,6 @@ class CXRDataset(BaseDataset):
             img_size=img_size,
             split=split,
             save_root=save_root,
-            memmap=memmap,
         )
         self.dataframe = self.dataframe.fillna(0)
         if "Path" in self.dataframe.columns:
@@ -291,15 +248,15 @@ class CXRDataset(BaseDataset):
         img_path = self.img_path / path_str
         assert img_path.exists(), f"Image path {img_path} does not exist"
         # load in image
-        img = Image.open(img_path).resize((self.img_size, self.img_size))
+        img = Image.open(img_path).resize(self.img_size)
         img = np.array(img, dtype=np.float32)
         img = img / 127.5 - 1
         img = np.expand_dims(img, axis=-1)
         assert img.shape == (
-            self.img_size,
-            self.img_size,
+            self.img_size[0],
+            self.img_size[1],
             1,
-        ), f"Image shape {img.shape} is not ({self.img_size}, {self.img_size}, 1)"
+        ), f"Image shape {img.shape} is not ({self.img_size[0]}, {self.img_size[1]}, 1)"
         return img
 
     def __gettarget__(self, index: int):
@@ -338,7 +295,7 @@ class FitzpatrickDataset(BaseDataset):
         df: pd.DataFrame,
         img_path: Path,
         name: str,
-        img_size: int,
+        img_size: Tuple[int, int],
         split: str,
         save_root: Path,
         label_setting: FitzPatLabelSetting = FitzPatLabelSetting.FINE,
@@ -361,7 +318,7 @@ class FitzpatrickDataset(BaseDataset):
     def __getinput__(self, index: int):
         img_path = self.img_path / f"{self.dataframe.iloc[index]['md5hash']}.jpg"
         img = Image.open(img_path)
-        img = img.resize((self.img_size, self.img_size))
+        img = img.resize(self.img_size)
         img = np.array(img, dtype=np.float32)
         img = img / 127.5 - 1
         return img
@@ -393,10 +350,9 @@ class EMBEDataset(BaseDataset):
         df: pd.DataFrame,
         img_path: Path,
         name: str,
-        img_size: int,
+        img_size: Tuple[int, int],
         split: str,
         save_root: Path,
-        memmap: bool = False,
     ):
         super().__init__(
             df=df,
@@ -407,18 +363,15 @@ class EMBEDataset(BaseDataset):
             img_size=img_size,
             split=split,
             save_root=save_root,
-            memmap=memmap,
         )
 
     def __getinput__(self, index: int):
         file_name = (
             self.dataframe.iloc[index]["anon_dicom_path"].split("/")[-1][:-4] + ".png"
         )
-        if not self.dataframe.iloc[index]["preprocessed_img_exists"]:
-            raise ValueError(f"Preprocessed image does not exist for {file_name}")
-        img_path = self.img_path / file_name
+        img_path = self.img_path / str(self.dataframe.iloc[index]["empi_anon"]) / file_name
         img = Image.open(img_path)
-        img = img.resize((self.img_size, self.img_size))
+        img = img.resize(self.img_size)
         img = np.array(img, dtype=np.float32)
         img = img / 127.5 - 1
         return img[..., None]
@@ -447,7 +400,7 @@ class FairVisionDataset(BaseDataset):
         df: pd.DataFrame,
         img_path: Path,
         name: str,
-        img_size: int,
+        img_size: Tuple[int, int],
         split: str,
         save_root: Path,
     ):
@@ -467,7 +420,7 @@ class FairVisionDataset(BaseDataset):
         file_name = self.dataframe.iloc[index]["slo_file_path"]
         img_path = self.img_path / file_name
         img = Image.open(img_path)
-        img = img.resize((self.img_size, self.img_size))
+        img = img.resize(self.img_size)
         img = np.array(img, dtype=np.float32)
         img = img / 127.5 - 1
         img = np.expand_dims(img[..., 0], axis=-1)
@@ -500,7 +453,7 @@ class PTBXLDataset(BaseDataset):
             name=name,
             num_classes=5,
             in_channels=12,
-            img_size=0,  # Not used for ECG, but required by the interface
+            img_size=(0,0),  # Not used for ECG, but required by the interface
             split=split,
             save_root=save_root,
         )

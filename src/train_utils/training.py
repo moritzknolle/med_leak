@@ -10,11 +10,13 @@ import keras
 import numpy as np
 import tensorflow as tf
 from absl import flags
+import pandas as pd
 
 import wandb
 
 from .logger import RetrainLogger
 from .utils import WandbLogger
+from ..data_utils.datasets import BaseDataset
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -25,6 +27,7 @@ def prepare_dataset(
     batch_size: int,
     shuffle: bool,
     augment: bool,
+    subset_indices: Optional[np.ndarray] = None,
     aug_fn: Optional[Callable] = None,
 ):
     """
@@ -46,36 +49,34 @@ def prepare_dataset(
     assert (
         inputs.max() != 255.0
     ), f"Make sure inputs are normalised appropriately, found max(inputs)={inputs.max()}"
-    assert (
-        inputs.dtype == keras.backend.floatx()
-        and inputs.dtype == keras.backend.floatx()
-    ), f"Found incorrects dtypes, expected {keras.backend.floatx()} and found {inputs.dtype} & {targets.dtype}"
-    # prepare the dataset
-    if inputs.base is None:
-        print("... using in-memory dataset")
-        ds = tf.data.Dataset.from_tensor_slices((inputs, targets))
-    else:
-        print("... using memmaped dataset")
-
-        def gen():
-            for i in range(len(inputs)):
-                yield inputs[i], targets[i]
-
-        ds = tf.data.Dataset.from_generator(
-            gen,
-            output_types=(inputs.dtype, targets.dtype),
-            output_shapes=(inputs[0].shape, targets[0].shape),
+    if inputs.dtype != np.float32:
+        print(
+            f"... converting inputs to np.float32"
         )
-
+        inputs = inputs.astype(np.float32)
+    if targets.dtype != np.float32:
+        print(
+            f"... converting targets to np.float32"
+        )
+        targets = targets.astype(np.float32)
+    if subset_indices is not None:
+        print(f"... using {len(subset_indices)/len(inputs)*100:.1f}% subset of the dataset")
+        inputs = inputs[subset_indices]
+        targets = targets[subset_indices]
+        assert (
+            len(inputs) == len(subset_indices) and len(targets) == len(subset_indices)
+        ), f"Mismatch between subset size and mask: {len(inputs)} != {len(subset_indices)} != {len(targets)}"
+    print("... using in-memory dataset")
+    ds = tf.data.Dataset.from_tensor_slices((inputs, targets))
     if shuffle:
         ds = ds.shuffle(ds.cardinality(), reshuffle_each_iteration=True)
     
-    if augment:
+    if augment and aug_fn is not None:
         ds = ds.map(
             lambda x, y: (aug_fn(x), y),
             num_parallel_calls=AUTOTUNE,
         )
-    ds = ds.batch(batch_size)
+    ds = ds.padded_batch(batch_size=batch_size, padding_values=0.0) # we use padded batching to ensure that all batches have the same shape (this avoids jit recompilation)
     return ds.prefetch(buffer_size=AUTOTUNE)
 
 
@@ -105,14 +106,15 @@ def print_dataset_stats(input_arr: np.ndarray, target_arr: np.ndarray, split: st
 
 def train_and_eval(
     compiled_model: keras.Model,
-    train_dataset: Tuple[np.ndarray, np.ndarray],
-    test_dataset: Tuple[np.ndarray, np.ndarray],
+    train_dataset: BaseDataset,
+    test_dataset: BaseDataset,
     batch_size: int,
     aug_fn: Callable,
     augment: bool,
     epochs: int,
     seed: int,
     target_metric: str,
+    subset_indices: Optional[np.ndarray] = None,
     callbacks: list = [],
     ckpt_file_path: Path = Path("./tmp/ckpt/"),
     track_data_stats: bool = True,
@@ -148,7 +150,6 @@ def train_and_eval(
     print(f"... starting training using keras backend: {keras.backend.backend()}")
     if keras.backend.backend() == "jax":
         import jax
-
         jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
     if log_wandb:
         if wandb_project_name == "":
@@ -157,35 +158,29 @@ def train_and_eval(
         wandb.config.update(flags.FLAGS)
         wandb.config.update({"run_seed": seed})
         wandb.config.update({"epochs": epochs})
-    n_train = len(train_dataset[0])
-    n_test = len(test_dataset[0])
-    is_memmap = train_dataset[0].base is not None
-    (
-        print_dataset_stats(train_dataset[0], train_dataset[1], "train")
-        if train_dataset[0].base is None
-        else 0
-    )
-    (
-        print_dataset_stats(test_dataset[0], test_dataset[1], "test")
-        if test_dataset[0].base is None
-        else 0
-    )
+    if subset_indices is None:
+        n_train = train_dataset.__len__()
+    else:
+        n_train = len(subset_indices)
+    n_test = len(test_dataset)
+    print_dataset_stats(train_dataset.inputs, train_dataset.targets, "train")
+    print_dataset_stats(test_dataset.inputs, test_dataset.targets, "test")
     print(
-        f"... training for {epochs} epochs ({epochs*(len(train_dataset[0])//batch_size)} steps)"
+        f"... training for {epochs} epochs ({epochs*(len(train_dataset)//batch_size)} steps)"
     )
-
     # prepare training and test datasets
-    train_dataset = prepare_dataset(
-        inputs=train_dataset[0],
-        targets=train_dataset[1],
+    train_ds = prepare_dataset(
+        inputs=train_dataset.inputs,
+        targets=train_dataset.targets,
+        subset_indices=subset_indices,
         batch_size=batch_size,
         shuffle=True,
         augment=augment,
         aug_fn=aug_fn,
     )
-    test_dataset = prepare_dataset(
-        inputs=test_dataset[0],
-        targets=test_dataset[1],
+    test_ds = prepare_dataset(
+        inputs=test_dataset.inputs,
+        targets=test_dataset.targets,
         batch_size=batch_size,
         shuffle=False,
         augment=False,
@@ -195,8 +190,8 @@ def train_and_eval(
     if track_data_stats:
         tmp_dir = Path("./tmp/imgs")
         tmp_dir.mkdir(exist_ok=True)
-        train_batch = next(iter(train_dataset.take(1)))
-        test_batch = next(iter(test_dataset.take(1)))
+        train_batch = next(iter(train_ds.take(1)))
+        test_batch = next(iter(test_ds.take(1)))
         random_idcs = np.random.randint(0, train_batch[0].shape[0], size=15)
         for i, idc in enumerate(random_idcs):
             if train_batch[0].shape[-1] in [1,3]:
@@ -217,7 +212,7 @@ def train_and_eval(
                 i += 1
 
         print("... delibaretely overfitting on first batch. Careful!")
-        train_dataset = first_batch_only(train_dataset)
+        train_ds = first_batch_only(train_ds)
     print(f"... training on {n_train} samples, evaluating on {n_test} samples")
 
     start_time = time.time()
@@ -249,13 +244,13 @@ def train_and_eval(
     callbacks = wandb_callbacks + callbacks
     try:
         training_history = compiled_model.fit(
-            train_dataset,
+            train_ds,
             epochs=epochs,
-            validation_data=test_dataset,
+            validation_data=test_ds,
             verbose=verbose,
             callbacks=callbacks,
-            steps_per_epoch=n_train // batch_size if is_memmap else None,
-            validation_steps=n_test // batch_size if is_memmap else None,
+            steps_per_epoch=n_train // batch_size,
+            validation_steps=n_test // batch_size,
         )
     except KeyboardInterrupt:
         if ckpt_file_path is not None:
@@ -275,7 +270,7 @@ def train_and_eval(
         del ckpt_callback
         os.remove(ckpt_file_path)
     test_metrics = compiled_model.evaluate(
-        test_dataset, verbose=verbose, return_dict=True
+        test_ds, verbose=verbose, return_dict=True
     )
     print(f"... test metrics: {test_metrics}")
     if log_wandb:
@@ -319,8 +314,9 @@ def generate_masks(
 
 def train_random_subset(
     compiled_model: keras.Model,
-    train_dataset: Tuple[np.ndarray, np.ndarray],
-    test_dataset: Tuple[np.ndarray, np.ndarray],
+    train_dataset: BaseDataset,
+    test_dataset: BaseDataset,
+    patient_id_col: str,
     batch_size: int,
     aug_fn: Callable,
     augment: bool,
@@ -348,6 +344,7 @@ def train_random_subset(
         compiled_model: keras.Model, compiled model
         train_dataset: Tuple[np.ndarray, np.ndarray], training dataset
         test_dataset: Tuple[np.ndarray, np.ndarray], testing dataset
+        patient_id_col: str, column name for patient IDs
         batch_size: int, batch size
         aug_fn: Callable, augmentation function
         augment: bool, whether to augment training data
@@ -374,6 +371,8 @@ def train_random_subset(
         free_memory=True
     )  # clear keras session from a potential previous run
     logdir.mkdir(parents=True, exist_ok=True)
+    # extract unique patient ids
+    patient_ids = pd.Series(train_dataset.dataframe[patient_id_col].unique())
     # check if supermask file and indices file exists
     super_mask_path = logdir / "super_mask.npy"
     valid_idcs_path = logdir / "valid_idcs.pkl"
@@ -423,7 +422,7 @@ def train_random_subset(
     else:
         super_mask = generate_masks(
             n_runs=n_total_runs,
-            dataset_size=len(train_dataset[0]),
+            dataset_size=len(patient_ids),
             subset_ratio=subset_ratio,
             seed=seed,
         )
@@ -437,29 +436,23 @@ def train_random_subset(
         with open(completed_idcs_path, "w+b") as f:
             pickle.dump(completed_idcs, f)
     assert len(subset_mask) == len(
-        train_dataset[0]
-    ), "Subset mask must match dataset size"
+        patient_ids
+    ), "Subset mask shape must match number of patients"
     subset_idcs = np.nonzero(subset_mask)[0]
-    train_inputs, train_targets = train_dataset
-    sub_train_inputs = train_inputs[subset_idcs]
-    sub_train_targets = train_targets[subset_idcs]
-    assert len(sub_train_inputs) == len(sub_train_targets), f"Mismatching input shapes: {len(sub_train_inputs)} != {len(sub_train_targets)}"
-    if len(sub_train_inputs) >= len(train_inputs):
-        print("... Warning. Subset is not smaller than full dataset!")
-    assert (
-        len(sub_train_inputs) == subset_mask.sum()
-    ), f"Mismatch between subset size and mask: {len(sub_train_inputs)} != {subset_mask.sum()}"
-    assert (
-        sub_train_inputs.shape[0] == sub_train_targets.shape[0]
-    ), "Mismatching input shapes"
-    print(
-        train_inputs.shape,
-        train_targets.shape,
-        sub_train_inputs.shape,
-        sub_train_targets.shape,
-        test_dataset[0].shape,
-        test_dataset[1].shape,
-    )
+    selected_patients = patient_ids[subset_idcs]
+    # convert patient-level subset mask to record-level mask
+    record_pids = train_dataset.dataframe[patient_id_col]
+    record_subset_mask = train_dataset.dataframe[patient_id_col].isin(selected_patients)
+    record_subset_idcs = np.nonzero(record_subset_mask)[0]
+    assert len(record_subset_idcs) < len(
+        record_pids
+    ), "Subset mask must be smaller than full dataset"
+    # check whether record selection by patient worked correctly
+    assert set(selected_patients) == set(
+        train_dataset.dataframe.loc[record_subset_idcs, patient_id_col]
+        .unique()
+        .tolist()
+    ), "Patient ids from selected subset do not match selected patients"
     if not isinstance(logdir, Path) and logdir is not None:
         logdir = Path(logdir)
     logger = RetrainLogger(
@@ -469,8 +462,9 @@ def train_random_subset(
     try:
         compiled_model, training_history, eval_metrics, run_failed = train_and_eval(
             compiled_model=compiled_model,
-            train_dataset=(sub_train_inputs, sub_train_targets),
+            train_dataset=train_dataset,
             test_dataset=test_dataset,
+            subset_indices=record_subset_idcs,
             batch_size=batch_size,
             aug_fn=aug_fn,
             augment=augment,
@@ -504,20 +498,17 @@ def train_random_subset(
     else:
         # save logits and labels of train as well as test set
         if log_wandb:
-            assert len(train_inputs) != len(
-                sub_train_inputs
-            ), "Random subset must be smaller than full dataset"
             train_ds = prepare_dataset(
-                inputs=train_inputs,  # full training dataset
-                targets=train_targets,
+                inputs=train_dataset.inputs,  # full training dataset
+                targets=train_dataset.targets,
                 batch_size=batch_size,
                 shuffle=False,
                 augment=augment,
                 aug_fn=aug_fn,
             )
             test_ds = prepare_dataset(
-                inputs=test_dataset[0],
-                targets=test_dataset[1],
+                inputs=test_dataset.inputs,
+                targets=test_dataset.targets,
                 batch_size=batch_size,
                 shuffle=False,
                 augment=augment_test,
@@ -532,17 +523,17 @@ def train_random_subset(
                 for i in range(n_eval_views):
                     train_logits.append(compiled_model.predict(train_ds))
                     test_logits.append(compiled_model.predict(test_ds))
-                train_logits = np.stack(train_logits, axis=1)
-                test_logits = np.stack(test_logits, axis=1)
+                train_logit_arr = np.stack(train_logits, axis=1)
+                test_logit_arr = np.stack(test_logits, axis=1)
             else:
-                train_logits = compiled_model.predict(train_ds)
-                test_logits = compiled_model.predict(test_ds)
-            print(train_logits.shape, test_logits.shape)
+                train_logit_arr = compiled_model.predict(train_ds)
+                test_logit_arr = compiled_model.predict(test_ds)
+            print(train_logit_arr.shape, test_logit_arr.shape)
             success = logger.log(
-                train_logits=train_logits,
-                train_labels=train_targets,
-                eval_logits=test_logits,
-                eval_labels=test_dataset[1],
+                train_logits=train_logit_arr,
+                train_labels=train_dataset.targets,
+                eval_logits=test_logit_arr,
+                eval_labels=test_dataset.targets,
                 metrics=eval_metrics,
             )
             if success:
@@ -559,4 +550,8 @@ def train_random_subset(
                     # unlock file
                     fcntl.flock(f2, fcntl.LOCK_UN)
                     pickle.dump(completed_idcs, f2)
+    if keras.backend.backend() == "jax":
+        import jax
+        jax.clear_caches() # this is important to prevent memory fragmentation which can otherwise slow down the next run
+        time.sleep(10)  # give some time for the backend to clear
     wandb.run.finish()
