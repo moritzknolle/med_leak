@@ -61,6 +61,11 @@ flags.DEFINE_integer(
     "eval_views", 16, "Number of augmentations to query when saving train/test logits."
 )
 flags.DEFINE_string(
+    "ckpt_file_path",
+    "./tmp/ckpts/",
+    "Path to root folder where the model checkpoint files are stored.",
+)
+flags.DEFINE_string(
     "save_root",
     "/home/moritz/data_fast/npy",
     "Path to root folder where the memmap files are stored.",
@@ -149,6 +154,7 @@ def main(argv):
                 augment=True if FLAGS.augment != "None" else False,
                 epochs=FLAGS.epochs,
                 callbacks=get_callbacks(FLAGS.ema),
+                ckpt_file_path=Path(FLAGS.ckpt_file_path),
                 seed=FLAGS.seed,
                 target_metric="val_auroc",
                 log_wandb=FLAGS.log_wandb,
@@ -173,6 +179,7 @@ def main(argv):
                     subset_ratio=FLAGS.subset_ratio,
                     n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
                     callbacks=get_callbacks(FLAGS.ema),
+                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
                     log_wandb=FLAGS.log_wandb,
                     wandb_project_name="fitzpatrick",
                 )

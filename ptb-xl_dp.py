@@ -60,11 +60,6 @@ flags.DEFINE_bool("eval_only", True, "Whether to only evaluate the model.")
 flags.DEFINE_integer(
     "n_runs", 200, "Number of leave-many-out re-training runs to perform."
 )
-flags.DEFINE_string(
-    "save_root",
-    "/home/moritz/data_fast/npy",
-    "Path to root folder where the memmap files are stored.",
-)
 flags.DEFINE_float(
     "subset_ratio", 0.5, "Ratio of the training data to use for each re-training run."
 )
@@ -72,9 +67,19 @@ flags.DEFINE_integer(
     "eval_views", 16, "Number of augmentations to query when saving train/test logits."
 )
 flags.DEFINE_string(
+    "save_root",
+    "/home/moritz/data_fast/npy",
+    "Path to root folder where the memmap files are stored.",
+)
+flags.DEFINE_string(
     "logdir",
     "./logs/ptb-xl/",
     "Path to logdir.",
+)
+flags.DEFINE_string(
+    "ckpt_file_path",
+    "./tmp/ckpts/",
+    "Path to root folder where the model checkpoint files are stored.",
 )
 flags.DEFINE_float("epsilon", 10.0, "Privacy budget epsilon for DP training.")
 flags.DEFINE_float("delta", 1e-5, "Privacy budget delta for DP training.")
@@ -178,6 +183,7 @@ def main(argv):
             epochs=FLAGS.epochs,
             target_metric="val_macro_auroc",
             callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
             seed=FLAGS.seed,
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="ptb-xl",
@@ -200,6 +206,7 @@ def main(argv):
                     subset_ratio=FLAGS.subset_ratio,
                     n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
                     callbacks=get_callbacks(FLAGS.ema),
+                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
                     log_wandb=FLAGS.log_wandb,
                     wandb_project_name="ptb-xl",
                 )
