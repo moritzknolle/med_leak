@@ -29,6 +29,7 @@ def prepare_dataset(
     augment: bool,
     subset_indices: Optional[np.ndarray] = None,
     aug_fn: Optional[Callable] = None,
+    drop_remainder:bool=True,
 ):
     """
     Prepare a tf.data.Dataset from the given inputs and targets np arrays.
@@ -80,7 +81,7 @@ def prepare_dataset(
     padded_shapes = (input_shape, (targets.shape[1],))
     # we use padded batching to ensure that all batches have the same shape (this avoids jit recompilation)
     #ds = ds.padded_batch(batch_size=batch_size, padding_values=0.0, padded_shapes=padded_shapes)
-    ds = ds.batch(batch_size=batch_size, drop_remainder=True)
+    ds = ds.batch(batch_size=batch_size, drop_remainder=drop_remainder)
     return ds.prefetch(buffer_size=AUTOTUNE)
 
 
@@ -509,6 +510,7 @@ def train_random_subset(
                 shuffle=False,
                 augment=augment,
                 aug_fn=aug_fn,
+                drop_remainder=False,
             )
             test_ds = prepare_dataset(
                 inputs=test_dataset.inputs,
@@ -517,6 +519,7 @@ def train_random_subset(
                 shuffle=False,
                 augment=augment_test,
                 aug_fn=aug_fn,
+                drop_remainder=False,
             )
             # set dtype policy to float32
             keras.config.set_dtype_policy("float32")

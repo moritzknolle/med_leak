@@ -107,7 +107,7 @@ class RetrainLogger:
         """
         self.maybe_create_log_dir()
         self.end_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        assert len(train_logits) == len(train_labels), "Careful! Shape mismatch"
+        assert len(train_logits) == len(train_labels), f"Careful! Shape mismatch, {train_logits.shape} {train_labels.shape}"
         try:
             np.save(self.log_dir / "train_logits.npy", train_logits)
             np.save(self.log_dir / "train_labels.npy", train_labels)
