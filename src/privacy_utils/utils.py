@@ -2,10 +2,48 @@ from enum import Enum
 from pathlib import Path
 from typing import List
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt #type: ignore
 import numpy as np
-import scipy
-from sklearn.metrics import roc_curve
+import pandas as pd #type: ignore
+import scipy #type: ignore
+from sklearn.metrics import roc_curve #type: ignore
+from tqdm import tqdm #type: ignore
+
+from ..data_utils.datasets import BaseDataset
+
+
+def convert_patientmask_to_recordmask(
+    patient_masks: np.ndarray,
+    patient_ids: pd.Series,
+    dataset: BaseDataset,
+    patient_id_col: str,
+):
+    """
+    Convert patient-level subset masks to record-level masks.
+    Args:
+        patient_masks: np.ndarray, shape=(N_runs, N_patients), boolean masks for patients
+        patient_ids: pd.Series, patient ids corresponding to the patient masks
+        dataset: BaseDataset, dataset containing the records
+        patient_id_col: str, column name in the dataset dataframe that contains patient ids
+    Returns:
+        record_masks: np.ndarray, shape=(N_runs, N_records), boolean masks for records
+    """
+    assert patient_masks.shape[1] == len(
+        patient_ids
+    ), f"Patient masks shape {patient_masks.shape} does not match patient ids shape {len(patient_ids)}"
+    # convert patient-level masks to record-level masks
+    n_runs, n_patients = patient_masks.shape
+    record_patient_ids = dataset.dataframe[patient_id_col]
+    record_masks = np.zeros((n_runs, len(dataset)), dtype=bool)
+    for i in tqdm(range(n_runs)):
+        # selected patients
+        selected_patients = patient_ids[patient_masks[i]]
+        # selected records
+        selected_records_mask = record_patient_ids.isin(selected_patients)
+        selected_records_idcs = np.nonzero(selected_records_mask)[0]
+        # set record masks
+        record_masks[i, selected_records_idcs] = True
+    return record_masks
 
 
 class CurveAverage(Enum):
@@ -172,7 +210,7 @@ def confidence_roc_plot(
     if draw_axes_labels:
         ax.set_xlabel("False Positive Rate")
         ax.set_ylabel("True Positive Rate")
-    ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[["right", "top"]].set_visible(False)
     if save_result:
         log_str = "log" if log_scale else "lin"
         out_path = Path(out_path)

@@ -371,7 +371,7 @@ class EMBEDataset(BaseDataset):
         )
         img_path = self.img_path / str(self.dataframe.iloc[index]["empi_anon"]) / file_name
         img = Image.open(img_path)
-        img = img.resize(self.img_size)
+        img = img.resize(self.img_size[::-1])
         img = np.array(img, dtype=np.float32)
         img = img / 127.5 - 1
         return img[..., None]

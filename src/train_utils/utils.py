@@ -166,6 +166,12 @@ def get_aug_fn(aug_strength: str):
         partial(tf.image.stateless_random_contrast, lower=0.0, upper=0.5),
         partial(tf.image.stateless_random_brightness, max_delta=0.1),
         ]
+    elif aug_strength == "rotate_constrast_brightness":
+        augs = [
+            stateless_random_rotate,
+            partial(tf.image.stateless_random_contrast, lower=0.0, upper=0.5),
+            partial(tf.image.stateless_random_brightness, max_delta=0.1),
+        ]
     elif aug_strength == "rotate":
         augs = [stateless_random_rotate]
     elif aug_strength == "none":

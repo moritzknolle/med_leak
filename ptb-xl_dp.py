@@ -9,6 +9,7 @@ os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]= "false"
 import keras # type: ignore
 import numpy as np
 from absl import app, flags # type: ignore
+from jax_privacy.keras import keras_api  # type: ignore
 
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
@@ -42,7 +43,7 @@ flags.DEFINE_float(
     "Relative fraction of total steps until learning rate is decayed to 1/10 times the original value. A value smaller than one means faster decay and likewise a bigger value leads to slower decay.",
 )
 flags.DEFINE_float("ema_decay", 0.995, "EMA decay.")
-flags.DEFINE_integer("grad_accum_steps", 2, "Number of gradient accumulation steps.")
+flags.DEFINE_integer("grad_accum_steps", 4, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_enum(
     "augment",
@@ -74,6 +75,11 @@ flags.DEFINE_string(
     "logdir",
     "./logs/ptb-xl/",
     "Path to logdir.",
+)
+flags.DEFINE_float("epsilon", 10.0, "Privacy budget epsilon for DP training.")
+flags.DEFINE_float("delta", 1e-5, "Privacy budget delta for DP training.")
+flags.DEFINE_float(
+    "clipping_norm", 0.5, "Clipping norm for DP training (gradient clipping)."
 )
 
 
@@ -123,7 +129,23 @@ def main(argv):
             weight_decay=FLAGS.weight_decay,
             use_ema=FLAGS.ema,
             ema_momentum=FLAGS.ema_decay,
-            gradient_accumulation_steps=FLAGS.grad_accum_steps,
+            gradient_accumulation_steps=None,
+        )
+        print("grad accum steps opt:", opt.gradient_accumulation_steps)
+        params = keras_api.DPKerasConfig(
+            epsilon=FLAGS.epsilon,
+            delta=FLAGS.delta,
+            clipping_norm=FLAGS.clipping_norm,
+            batch_size=FLAGS.batch_size,
+            gradient_accumulation_steps=1,
+            train_steps=STEPS,
+            train_size=len(train_dataset),
+            seed=FLAGS.seed,
+        )
+        model = keras_api.make_private(model, params)
+        print(
+            f"DP training:{FLAGS.epsilon=} {FLAGS.delta=} {FLAGS.clipping_norm=} {FLAGS.batch_size=} "
+            f" {FLAGS.epochs=} {len(train_dataset)=}"
         )
         # compile model
         model.compile(

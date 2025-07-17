@@ -40,6 +40,8 @@ ImageSizeArg = typing.Union[typing.Tuple[int, int], int]
 
 def interpret_image_size(image_size_arg: ImageSizeArg) -> typing.Tuple[int, int]:
     """Process the image_size argument whether a tuple or int."""
+    if isinstance(image_size_arg, list):
+        image_size_arg = tuple(image_size_arg)
     if isinstance(image_size_arg, int):
         return (image_size_arg, image_size_arg)
     if (

@@ -76,7 +76,11 @@ def prepare_dataset(
             lambda x, y: (aug_fn(x), y),
             num_parallel_calls=AUTOTUNE,
         )
-    ds = ds.padded_batch(batch_size=batch_size, padding_values=0.0) # we use padded batching to ensure that all batches have the same shape (this avoids jit recompilation)
+    input_shape = inputs.shape[1:]
+    padded_shapes = (input_shape, (targets.shape[1],))
+    # we use padded batching to ensure that all batches have the same shape (this avoids jit recompilation)
+    #ds = ds.padded_batch(batch_size=batch_size, padding_values=0.0, padded_shapes=padded_shapes)
+    ds = ds.batch(batch_size=batch_size, drop_remainder=True)
     return ds.prefetch(buffer_size=AUTOTUNE)
 
 

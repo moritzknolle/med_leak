@@ -38,13 +38,12 @@ flags.DEFINE_float(
 flags.DEFINE_float("ema_decay", 0.995, "EMA decay.")
 flags.DEFINE_integer("grad_accum_steps", 2, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
-flags.DEFINE_enum(
+flags.DEFINE_string(
     "augment",
-    "weak",
-    ["trivial", "weak", "medium", "strong", "none"],
+    "rotate_constrast_brightness",
     "What type of data augmentations strength to apply.",
 )
-flags.DEFINE_list("img_size", [64, 64], "Image size.")
+flags.DEFINE_list("img_size", [64, 48], "Image size.")
 flags.DEFINE_boolean(
     "mixed_precision",
     True,

@@ -1,10 +1,10 @@
 import os
-from absl import app
+from absl import app # type: ignore
 
 os.environ["KERAS_BACKEND"] = "jax"
-from jax_privacy.keras import keras_api  # pylint: disable=g-import-not-at-top
-import keras
-from keras import layers
+from jax_privacy.keras import keras_api  # type: ignore
+import keras # type: ignore
+from keras import layers # type: ignore
 import numpy as np
 
 num_classes = 10
@@ -49,13 +49,13 @@ def main(_):
     print(f"test data shape: {x_test.shape}, {y_test.shape}")
     model = get_model()
 
-    epsilon = 1.1
+    epsilon = 5.0
     delta = 1e-5
-    batch_size = 200
-    epochs = 10
+    batch_size = 1_000
+    epochs = 25
     train_size = len(x_train)
     dp = True
-    clipping_norm = 2.0
+    clipping_norm = 0.5
 
     if dp:
         params = keras_api.DPKerasConfig(
@@ -63,7 +63,7 @@ def main(_):
             delta=delta,
             clipping_norm=clipping_norm,
             batch_size=batch_size,
-            gradient_accumulation_steps=1,
+            gradient_accumulation_steps=5,
             train_steps=epochs * (train_size // batch_size),
             train_size=train_size,
             seed=0,
@@ -76,7 +76,7 @@ def main(_):
     else:
         print("Non-DP training")
     model.compile(
-        loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"]
+        loss="categorical_crossentropy", optimizer=keras.optimizers.Adam(gradient_accumulation_steps=5, learning_rate=5e-3), metrics=["accuracy"]
     )
     model.fit(
         x_train,

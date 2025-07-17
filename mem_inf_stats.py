@@ -18,7 +18,7 @@ from src.privacy_utils.plot_utils import (disease_group_plots,
                                           mia_auc_esf_plot, plot_images,
                                           subgroup_plots)
 from src.privacy_utils.rmia import perform_rmia, rmia_transform
-from src.privacy_utils.utils import confidence_roc_plot
+from src.privacy_utils.utils import confidence_roc_plot, convert_patientmask_to_recordmask
 from src.train_utils.utils import get_label_mode
 
 # force jax to use CPU
@@ -43,7 +43,7 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/mimic-iv-ed/resnet_300_6", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/mimic-iv-ed/resnet_275_6", "The log directory.")
 flags.DEFINE_string(
     "dataset",
     "mimic-iv-ed",
@@ -197,6 +197,12 @@ def main(argv):
         multi_processing=FLAGS.multiprocessing,
         threads=FLAGS.threads,
     )
+    masks = convert_patientmask_to_recordmask(
+        patient_masks=masks,
+        patient_ids=train_dataset.dataframe[get_patient_col(FLAGS.dataset)].unique(),
+        dataset=train_dataset,
+        patient_id_col=get_patient_col(FLAGS.dataset),
+    )
     print(f"LiRA scores shape: {scores.shape}")
     if not FLAGS.patient_level_only:
         rmia_scores, rmia_masks, _ = compute_scores(
@@ -204,6 +210,12 @@ def main(argv):
             load_score_func=rmia_load_func,
             multi_processing=FLAGS.multiprocessing,
             threads=FLAGS.threads,
+        )
+        rmia_masks = convert_patientmask_to_recordmask(
+            patient_masks=rmia_masks,
+            patient_ids=train_dataset.dataframe[get_patient_col(FLAGS.dataset)].unique(),
+            dataset=train_dataset,
+            patient_id_col=get_patient_col(FLAGS.dataset),
         )
         assert np.allclose(masks, rmia_masks), "Careful, masks do not match."
         print(f"RMIA scores shape: {rmia_scores.shape}")
