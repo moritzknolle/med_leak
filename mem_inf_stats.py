@@ -43,10 +43,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/mimic-iv-ed/resnet_275_6", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/chexpert/wrn_28_2", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "mimic-iv-ed",
+    "chexpert",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -62,7 +62,7 @@ flags.DEFINE_string(
     "multiclass",
     "The label mode to use. One of ['binary', 'multiclass', 'multilabel', 'simclr']",
 )
-flags.DEFINE_integer("img_size", 128, "Image size (for plotting only).")
+flags.DEFINE_list("img_size", [512, 512], "Image size.")
 flags.DEFINE_integer("n_models", 200, "Total number of models to use for the attack.")
 flags.DEFINE_integer(
     "eval_size", 10, "Number of samples/training runs to use for validation."
@@ -129,7 +129,7 @@ def get_patient_col(dataset_name: str):
     elif dataset_name == "embed":
         patient_col = "empi_anon"
     elif dataset_name == "fitzpatrick":
-        raise ValueError("Fitzpatrick does not have patient IDs.")
+        patient_col = "md5hash" # we assume each image belongs to a unique patient
     elif dataset_name == "ptb-xl":
         patient_col = "patient_id"
     elif dataset_name == "mimic-iv-ed":
@@ -162,6 +162,7 @@ def get_data_root(dataset_name: str):
 def main(argv):
     np.random.seed(FLAGS.seed)
     print("... computing MIA results for dataset", FLAGS.dataset, "from", FLAGS.logdir)
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
     train_dataset, _ = get_dataset(
         dataset_name=FLAGS.dataset,
         img_size=FLAGS.img_size,

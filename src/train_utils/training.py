@@ -454,7 +454,7 @@ def train_random_subset(
     ), "Subset mask must be smaller than full dataset"
     # check whether record selection by patient worked correctly
     assert set(selected_patients) == set(
-        train_dataset.dataframe.loc[record_subset_idcs, patient_id_col]
+        train_dataset.dataframe.iloc[record_subset_idcs][patient_id_col]
         .unique()
         .tolist()
     ), "Patient ids from selected subset do not match selected patients"

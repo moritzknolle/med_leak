@@ -173,6 +173,7 @@ def main(argv):
                     compiled_model=model,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
+                    patient_id_col="patient_id",
                     batch_size=FLAGS.batch_size,
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,

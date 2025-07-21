@@ -161,6 +161,7 @@ def main(argv):
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
                     batch_size=FLAGS.batch_size,
+                    patient_id_col="patient_id",
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,
                     epochs=FLAGS.epochs,
