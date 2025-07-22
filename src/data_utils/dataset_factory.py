@@ -160,6 +160,7 @@ def get_dataset(
             name="ptb-xl",
             split="train",
             save_root=save_root,
+            load_base_file=not load_from_disk,
         )
         test_dataset = PTBXLDataset(
             df=test_df,
@@ -167,6 +168,7 @@ def get_dataset(
             name="ptb-xl",
             split="test",
             save_root=save_root,
+            load_base_file=not load_from_disk,
         )
     elif dataset_name == "mimic-iv-ed":
         train_df = pd.read_csv(csv_root / "mimic-iv-ed_train.csv")

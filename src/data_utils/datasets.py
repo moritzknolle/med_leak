@@ -445,6 +445,7 @@ class PTBXLDataset(BaseDataset):
         name: str,
         split: str,
         save_root: Path,
+        load_base_file: bool = True,
     ):
 
         super().__init__(
@@ -457,11 +458,11 @@ class PTBXLDataset(BaseDataset):
             split=split,
             save_root=save_root,
         )
-        self.ecg_inputs = np.load(img_path / f"X_100_{split}.npy")
+        if load_base_file:
+            self.ecg_inputs = np.load(img_path / f"X_100_{split}.npy")
 
     def __getinput__(self, index: int):
         """Returns input corresponding to index i in the dataset"""
-        # TODO check whether to apply normalization here or not
         return self.ecg_inputs[index]
 
     def __gettarget__(self, index: int):
