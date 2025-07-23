@@ -43,10 +43,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/chexpert/wrn_28_2", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/ptb-xl/resnet1d_128", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "chexpert",
+    "ptb-xl",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -62,7 +62,7 @@ flags.DEFINE_string(
     "multiclass",
     "The label mode to use. One of ['binary', 'multiclass', 'multilabel', 'simclr']",
 )
-flags.DEFINE_list("img_size", [512, 512], "Image size.")
+flags.DEFINE_list("img_size", [256, 256], "Image size.")
 flags.DEFINE_integer("n_models", 200, "Total number of models to use for the attack.")
 flags.DEFINE_integer(
     "eval_size", 10, "Number of samples/training runs to use for validation."
@@ -147,7 +147,7 @@ def get_data_root(dataset_name: str):
     elif dataset_name == "fairvision":
         data_root = Path("/home/moritz/data_big/fairvision/FairVision")
     elif dataset_name == "embed":
-        data_root = Path("/home/moritz/data_huge/embed_small/processed_512x512")
+        data_root = Path("/home/moritz/data_massive/embed_small/png/1024x768")
     elif dataset_name == "fitzpatrick":
         data_root = Path("/home/moritz/data/fitzpatrick17k")
     elif dataset_name == "ptb-xl":
@@ -165,10 +165,11 @@ def main(argv):
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
     train_dataset, _ = get_dataset(
         dataset_name=FLAGS.dataset,
-        img_size=FLAGS.img_size,
+        img_size=IMG_SIZE,
         csv_root=Path(FLAGS.csv_root),
         save_root=Path(FLAGS.save_root),
         data_root=get_data_root(FLAGS.dataset),
+        load_from_disk=FLAGS.dataset != "ptb-xl",
     )
     base_dir = Path(FLAGS.logdir)
     out_dir = Path(f"./figs/{FLAGS.dataset}")

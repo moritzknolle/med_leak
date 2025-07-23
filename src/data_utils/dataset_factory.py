@@ -37,6 +37,7 @@ def get_dataset(
         Returns:
             train_dataset: either tuple of numpy arrays or a BaseDataset object
     """
+    assert len(img_size) == 2, "img_size must be a tuple of (height, width)"
     if dataset_name == "chexpert":
         cxp_df_path = (
             csv_root / "chexpert_train.csv"

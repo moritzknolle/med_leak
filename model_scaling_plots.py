@@ -100,7 +100,7 @@ def main(argv):
     out_dir = Path(f"./figs/{FLAGS.dataset_name}")
     train_dataset, _ = get_dataset(
         dataset_name=FLAGS.dataset_name,
-        img_size=128,
+        img_size=[64, 64],
         csv_root=Path(FLAGS.csv_root),
         save_root=Path(FLAGS.save_root),
         data_root=Path(""),

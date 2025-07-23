@@ -479,7 +479,7 @@ def record_MIA_ROC_analysis(
         / (in_scores.shape[0] * out_scores.shape[0])
     )
     print(f"Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
-    print(f"Distribution Summary: /n/t mu={np.mean(aucs):.3g}, std={np.std(aucs):.3g}, min={np.min(aucs):.3g}, max={np.max(aucs):.3g}, 90%ile={np.percentile(aucs, 90):.3g}, 95%ile={np.percentile(aucs, 95):.3g}, 99%ile={np.percentile(aucs, 99):.3g}")
+    print(f"AUC Distribution Summary: /n/t mu={np.mean(aucs):.3g}, std={np.std(aucs):.3g}, min={np.min(aucs):.3g}, max={np.max(aucs):.3g}, 90%ile={np.percentile(aucs, 90):.3g}, 95%ile={np.percentile(aucs, 95):.3g}, 99%ile={np.percentile(aucs, 99):.3g}")
     assert (
         np.count_nonzero(np.isnan(aucs)) == 0
     ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}, mean={np.nanmean(aucs)}, std={np.nanstd(aucs)}, min={np.nanmin(aucs)}, max={np.nanmax(aucs)}"

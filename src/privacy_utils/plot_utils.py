@@ -1041,5 +1041,6 @@ def plot_images(
         plt.savefig(
             out_dir / f"{dataset_name}_imgs_auc_{save_str}.pdf",
             bbox_inches="tight",
+            dpi=500,
         )
     plt.show()
