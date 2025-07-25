@@ -98,7 +98,7 @@ def main(argv):
         ax.plot(
             fpr,
             np.load(files_dir / f"{FLAGS.mia_method}_tpr_mean_{scale}.npy"),
-            label=f"{get_dataset_name(dataset_name)} ({np.mean(record_level_mia_aucs):.2f}|{np.mean(aucs):.2f})",
+            label=f"{get_dataset_name(dataset_name)} ({np.mean(record_level_mia_aucs):.2f})",
             color=get_color(dataset_name),
         )
         ax.fill_between(

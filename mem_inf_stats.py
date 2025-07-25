@@ -20,6 +20,7 @@ from src.privacy_utils.plot_utils import (disease_group_plots,
 from src.privacy_utils.rmia import perform_rmia, rmia_transform
 from src.privacy_utils.utils import confidence_roc_plot, convert_patientmask_to_recordmask
 from src.train_utils.utils import get_label_mode
+from convenience_utils import fig_dir_exists, get_patient_col, get_data_root
 
 # force jax to use CPU
 import os
@@ -43,10 +44,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/ptb-xl/resnet1d_128", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/embed/wrn_28_2", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "ptb-xl",
+    "embed",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -62,7 +63,7 @@ flags.DEFINE_string(
     "multiclass",
     "The label mode to use. One of ['binary', 'multiclass', 'multilabel', 'simclr']",
 )
-flags.DEFINE_list("img_size", [256, 256], "Image size.")
+flags.DEFINE_list("img_size", [256, 192], "Image size.")
 flags.DEFINE_integer("n_models", 200, "Total number of models to use for the attack.")
 flags.DEFINE_integer(
     "eval_size", 10, "Number of samples/training runs to use for validation."
@@ -113,50 +114,6 @@ flags.DEFINE_integer("seed", 21, "Random seed.")
 FLAGS = flags.FLAGS
 
 
-def fig_dir_exists(out_dir: Path):
-    if not out_dir.exists():
-        out_dir.mkdir(parents=True, exist_ok=True)
-    files_dir = out_dir / "files"
-    if not files_dir.exists():
-        files_dir.mkdir(parents=True, exist_ok=True)
-
-
-def get_patient_col(dataset_name: str):
-    if dataset_name == "chexpert" or dataset_name == "fairvision":
-        patient_col = "patient_id"
-    elif dataset_name == "mimic":
-        patient_col = "subject_id"
-    elif dataset_name == "embed":
-        patient_col = "empi_anon"
-    elif dataset_name == "fitzpatrick":
-        patient_col = "md5hash" # we assume each image belongs to a unique patient
-    elif dataset_name == "ptb-xl":
-        patient_col = "patient_id"
-    elif dataset_name == "mimic-iv-ed":
-        patient_col = "subject_id"
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
-    return patient_col
-
-
-def get_data_root(dataset_name: str):
-    if dataset_name == "chexpert":
-        data_root = Path("/home/moritz/data/chexpert")
-    elif dataset_name == "mimic":
-        data_root = Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg")
-    elif dataset_name == "fairvision":
-        data_root = Path("/home/moritz/data_big/fairvision/FairVision")
-    elif dataset_name == "embed":
-        data_root = Path("/home/moritz/data_massive/embed_small/png/1024x768")
-    elif dataset_name == "fitzpatrick":
-        data_root = Path("/home/moritz/data/fitzpatrick17k")
-    elif dataset_name == "ptb-xl":
-        data_root = Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/")
-    elif dataset_name == "mimic-iv-ed":
-        data_root = None
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
-    return data_root
 
 
 def main(argv):

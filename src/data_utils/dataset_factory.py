@@ -108,7 +108,7 @@ def get_dataset(
         )
     elif dataset_name == "embed":
         embed_df = (
-            pd.read_csv("./data/csv/embed.csv")
+            pd.read_csv("./data/csv/embed.csv", low_memory=False)
         )
         train_df, test_df = (
             embed_df[embed_df.split == "train"],

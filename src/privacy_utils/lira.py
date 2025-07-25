@@ -172,7 +172,8 @@ def loss_logit_transform_binary(
         labels: A numpy array of shape (samples, N_classes), one-hot or multi-hot encoded.
         is_mimic_or_chexpert: A boolean indicating whether the dataset is MIMIC-CXR or CheXpert.
     Returns:
-        A numpy array of shape (samples,) containing the logit transformed confidence scores."""
+        A numpy array of shape (samples,) containing the logit transformed confidence scores.
+    """
     # repeat labels such that they match the shape of the logits (over augmentations of the same record)
     if len(logits.shape) > 2:
         labels = labels[:, None, :]
@@ -276,7 +277,7 @@ def perform_lira(
             train_scores.shape[1] == test_scores.shape[1]
         ), f"Train/Test Shapes do not match: {train_scores.shape} vs {test_scores.shape}"
     if label_type != LabelType.MULTICLASS:
-        raise ValueError("Only multiclass setting is supported")    
+        raise ValueError("Only multiclass setting is supported")
     assert (
         train_scores.shape[0] == train_masks.shape[0]
     ), f"Shapes do not match: {train_scores.shape} vs {train_masks.shape}"
@@ -321,7 +322,7 @@ def perform_lira(
     else:
         std_in = np.std(dat_in, 0)
         std_out = np.std(dat_out, 0)
-    
+
     pred_func = partial(
         get_preds_univariate, other_args=[mean_in, mean_out, std_in, std_out]
     )
@@ -396,31 +397,7 @@ def get_preds_multivariate(scrs: np.ndarray, other_args: List):
     return preds
 
 
-def record_MIA_ROC_analysis(
-    scores: np.ndarray,
-    masks: np.ndarray,
-    resolution: int = 10_000,
-    log_scale: int = False,
-    compute_roc_curves: bool = False,
-    eps: float = 1e-45,
-):
-    """
-    Performs MIA ROC analyisis for each record in the dataset independently instead of measuring average attack success over the whole dataset.
-    Uses the analytical solution for the ROC curve in the binormal case since the scores are normally distributed.
-    Args:
-        scores: A numpy array of shape (n_samples, n_runs) containing the test scores (logit transformed model confidences).
-        masks: A numpy array of shape (n_samples, n_runs) containing the subset mask.
-        resolution: The resolution for the ROC curve.
-        log_scale: Whether the ROC curve will be plotted on a log-scale. If true, this will use a logspace for the FPR.
-        compute_roc_curves: Whether to compute the ROC curves.
-        eps: A small epsilon to avoid division by zero.
-    Returns:
-        fprs: A numpy array of shape (resolution, n_samples) containing the false positive rates.
-        tprs: A numpy array of shape (resolution, n_samples) containing the true positive rates.
-        aucs: A numpy array of shape (n_samples,) containing the area under the ROC curve.
-        se_aucs: A numpy array of shape (n_samples,) containing the standard error of the AUC scores.
-
-    """
+def preprocess_scores(scores: np.ndarray, masks: np.ndarray):
     dat_in, dat_out = [], []
     for j in range(scores.shape[1]):
         data_point_mask = masks[:, j]
@@ -433,21 +410,28 @@ def record_MIA_ROC_analysis(
     # truncate to the minimum size to make array
     in_scores = np.stack([x[:in_size] for x in dat_in], axis=1)
     out_scores = np.stack([x[:out_size] for x in dat_out], axis=1)
+    return in_scores, out_scores
 
-    # compute ROC curves analytically
-    mean_in = np.mean(in_scores, axis=0)
-    mean_out = np.mean(out_scores, axis=0)
-    std_in = np.std(in_scores, axis=0)
-    std_out = np.std(out_scores, axis=0)
+
+def roc_analysis_from_gaussian_samplestats(
+    mean_in: np.ndarray,
+    mean_out: np.ndarray,
+    std_in: np.ndarray,
+    std_out: np.ndarray,
+    N_in: int,
+    N_out: int,
+    resolution: int = 10_000,
+    log_scale: bool = False,
+    compute_roc_curves: bool = False,
+    eps: float = 1e-10,
+    verbose:bool=True,
+):
     # average over augmentations if present
     if len(mean_in.shape) == 2:
         mean_in = np.mean(mean_in, axis=1)
         mean_out = np.mean(mean_out, axis=1)
         std_in = np.mean(std_in, axis=1)
         std_out = np.mean(std_out, axis=1)
-    print(
-        f"... using N_in={in_scores.shape[0]} and N_out={out_scores.shape[0]} samples to estimate record-level sampling distributions"
-    )
     std_in += eps  # add small epsilon to avoid division by zero
     a = (mean_in - mean_out) / std_in
     b = std_out / std_in
@@ -471,16 +455,86 @@ def record_MIA_ROC_analysis(
     aucs = scipy.stats.norm.cdf(
         (mean_in - mean_out) / np.sqrt(std_out**2 + std_in**2)
     )  # analytical solution for the the AUC
+    aucs = np.clip(aucs, 0.5, 1-eps) # subtract small epsilon to improve numerical stability
     q_0 = aucs / (2 - aucs)
     q_1 = 2 * aucs**2 / (1 + aucs)
     # standard error of the AUC in the binormal setting (Hanley and McNeil, 1982)
     se_aucs = np.sqrt(
-        (aucs * (1 - aucs) + (in_scores.shape[0] - 1) * (q_0 - aucs**2) + (out_scores.shape[0] - 1) * (q_1 - aucs**2))
-        / (in_scores.shape[0] * out_scores.shape[0])
+        (
+            aucs * (1 - aucs)
+            + (N_in - 1) * (q_0 - aucs**2)
+            + (N_out - 1) * (q_1 - aucs**2)
+        )
+        / (N_in * N_out)
     )
-    print(f"Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}")
-    print(f"AUC Distribution Summary: /n/t mu={np.mean(aucs):.3g}, std={np.std(aucs):.3g}, min={np.min(aucs):.3g}, max={np.max(aucs):.3g}, 90%ile={np.percentile(aucs, 90):.3g}, 95%ile={np.percentile(aucs, 95):.3g}, 99%ile={np.percentile(aucs, 99):.3g}")
+    if verbose:
+        print(
+            f"... Standard Error Summary: SE(AUC) min: {np.min(se_aucs):.3g}, max={np.max(se_aucs):.3g}"
+        )
+        print(
+            f"... AUC Distribution Summary: mu={np.mean(aucs):.3g}, std={np.std(aucs):.3g}, min={np.min(aucs):.3g}, max={np.max(aucs):.3g}, 90%ile={np.percentile(aucs, 90):.3g}, 95%ile={np.percentile(aucs, 95):.3g}, 99%ile={np.percentile(aucs, 99):.3g}"
+        )
+    if np.count_nonzero(np.isnan(aucs)) != 0:
+        problem_records = np.where(np.isnan(aucs))[0]
+        print(f"... overview of records (and their values) causing numerical instabilities for AUC computation:")
+        print(f"mean_in: {mean_in[problem_records]}")
+        print(f"mean_out: {mean_out[problem_records]}")
+        print(f"std_in: {std_in[problem_records]}")
+        print(f"std_out: {std_out[problem_records]}")
+    if np.count_nonzero(np.isnan(se_aucs)) != 0:
+        problem_records = np.where(np.isnan(se_aucs))[0]
+        print(
+            f"... overview of records (and their values) causing numerical instabilities for SE(AUC) computation:"
+        )
+        print(f"aucs: {aucs[problem_records]}")
     assert (
         np.count_nonzero(np.isnan(aucs)) == 0
     ), f"Found {np.count_nonzero(np.isnan(aucs))} NaN in AUCs: {aucs}, mean={np.nanmean(aucs)}, std={np.nanstd(aucs)}, min={np.nanmin(aucs)}, max={np.nanmax(aucs)}"
+    return fprs, tprs, aucs, se_aucs
+
+
+def record_MIA_ROC_analysis(
+    scores: np.ndarray,
+    masks: np.ndarray,
+    resolution: int = 10_000,
+    log_scale: bool = False,
+    compute_roc_curves: bool = False,
+):
+    """
+    Performs MIA ROC analyisis for each record in the dataset independently.
+    Uses the analytical solution for the ROC curve in the binormal case since the scores are normally distributed.
+    Args:
+        scores: A numpy array of shape (n_samples, n_runs) containing the test scores (logit transformed model confidences).
+        masks: A numpy array of shape (n_samples, n_runs) containing the subset mask.
+        resolution: The resolution for the ROC curve.
+        log_scale: Whether the ROC curve will be plotted on a log-scale. If true, this will use a logspace for the FPR.
+        compute_roc_curves: Whether to compute the ROC curves.
+    Returns:
+        fprs: A numpy array of shape (resolution, n_samples) containing the false positive rates.
+        tprs: A numpy array of shape (resolution, n_samples) containing the true positive rates.
+        aucs: A numpy array of shape (n_samples,) containing the area under the ROC curve.
+        se_aucs: A numpy array of shape (n_samples,) containing the standard error of the AUC scores.
+
+    """
+    in_scores, out_scores = preprocess_scores(scores, masks)
+
+    # compute ROC curves analytically
+    mean_in = np.mean(in_scores, axis=0)
+    mean_out = np.mean(out_scores, axis=0)
+    std_in = np.std(in_scores, axis=0)
+    std_out = np.std(out_scores, axis=0)
+    print(
+        f"... using N_in={in_scores.shape[0]} and N_out={out_scores.shape[0]} samples to estimate record-level sampling distributions"
+    )
+    fprs, tprs, aucs, se_aucs = roc_analysis_from_gaussian_samplestats(
+        mean_in=mean_in,
+        mean_out=mean_out,
+        std_in=std_in,
+        std_out=std_out,
+        N_in=in_scores.shape[0],
+        N_out=out_scores.shape[0],
+        resolution=resolution,
+        log_scale=log_scale,
+        compute_roc_curves=compute_roc_curves,
+    )
     return fprs, tprs, aucs, se_aucs
