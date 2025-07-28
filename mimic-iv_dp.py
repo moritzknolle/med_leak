@@ -20,8 +20,8 @@ from src.train_utils.utils import (
 )
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 50, "Number of training steps.")
-flags.DEFINE_float("learning_rate", 0.1, "Learning rate.")
+flags.DEFINE_integer("epochs", 100, "Number of training steps.")
+flags.DEFINE_float("learning_rate", 0.25, "Learning rate.")
 flags.DEFINE_float("weight_decay", 1e-3, "L2 weight decay.")
 flags.DEFINE_float("momentum", 0.9, "Momentum parameter.")
 flags.DEFINE_integer("batch_size", 512, "Batch size.")
@@ -30,7 +30,7 @@ flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & bia
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "tabresnet_275_6", "Name of the model to use.")
+flags.DEFINE_string("model", "tabresnet_100_6", "Name of the model to use.")
 flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup",
@@ -75,10 +75,9 @@ flags.DEFINE_string(
     "./logs/mimic-iv-ed/",
     "Path to logdir.",
 )
-flags.DEFINE_float("epsilon", 100.0, "Privacy budget parameter epsilon for DP training.")
-flags.DEFINE_float("delta", 1e-5, "Privacy budget parameter delta for DP training.")
+flags.DEFINE_float("epsilon", 10.0, "Privacy budget parameter epsilon for DP training.")
 flags.DEFINE_float(
-    "clipping_norm", 7.5, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 1.0, "Clipping norm for DP training (gradient clipping)."
 )
 
 
@@ -101,8 +100,10 @@ def main(argv):
     # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        train_size = len(train_dataset)
     else:
         STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+        train_size = int(len(train_dataset) * FLAGS.subset_ratio)
 
     def get_compiled_model():
         # create model, lr schedule and optimizer
@@ -121,14 +122,15 @@ def main(argv):
         )
         params = keras_api.DPKerasConfig(
             epsilon=FLAGS.epsilon,
-            delta=FLAGS.delta,
+            delta=1/train_size,
             clipping_norm=FLAGS.clipping_norm,
             batch_size=FLAGS.batch_size,
             gradient_accumulation_steps=1,
             train_steps=STEPS,
-            train_size=len(train_dataset),
+            train_size=train_size,
             seed=FLAGS.seed,
         )
+        print(params)
         model = keras_api.make_private(model, params)
         opt = keras.optimizers.SGD(
             learning_rate=(

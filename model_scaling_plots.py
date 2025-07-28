@@ -12,10 +12,14 @@ from mem_inf_stats import get_patient_col
 from src.data_utils.dataset_factory import get_dataset
 from src.privacy_utils.common import aggregate_by_patient
 from src.privacy_utils.common import load_score
-from src.privacy_utils.lira import (compute_scores,
-                                    loss_logit_transform_multiclass,
-                                    loss_logit_transform_multilabel,
-                                    perform_lira, record_MIA_ROC_analysis)
+from src.privacy_utils.utils import convert_patientmask_to_recordmask
+from src.privacy_utils.lira import (
+    compute_scores,
+    loss_logit_transform_multiclass,
+    loss_logit_transform_multilabel,
+    perform_lira,
+    record_MIA_ROC_analysis,
+)
 
 FONT_SIZE = 7
 plt.style.use("default")
@@ -34,7 +38,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset.")
+flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset.")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.925, "upper y-limit for test performance metric plot"
@@ -57,8 +61,7 @@ CHEX_LOGDIRS = {
     "CNN": "./logs/chexpert/small_cnn",
     "WRN_28_2": "./logs/chexpert/wrn_28_2",
     "WRN_28_5": "./logs/chexpert/wrn_28_5",
-    # "VIT-B/16": "./logs/chexpert/vit_b_16_64x64",
-    "VIT-B/16": "./logs/chexpert/vit_b_16_128x128",
+    "VIT-B/16": "./logs/chexpert/vit_b_16",
 }
 CHEX_COLORS = {
     "CNN": "#bed3f7",
@@ -110,7 +113,7 @@ def main(argv):
     test_metric_name = (
         "_val_macro_auroc(cxp)" if FLAGS.dataset_name == "chexpert" else "_val_auroc"
     )
-    is_mimic_or_chexpert = FLAGS.dataset_name in ["mimic-cxr", "chexpert"]
+    is_mimic_or_chexpert = FLAGS.dataset_name == "chexpert"
     logit_transform_func = partial(
         loss_logit_transform_multiclass, is_mimic_or_chexpert=is_mimic_or_chexpert
     )
@@ -133,6 +136,14 @@ def main(argv):
             load_score_func=load_func,
             multi_processing=True,
             threads=16,
+        )
+        masks = convert_patientmask_to_recordmask(
+            patient_masks=masks,
+            patient_ids=train_dataset.dataframe[
+                get_patient_col(FLAGS.dataset_name)
+            ].unique(),
+            dataset=train_dataset,
+            patient_id_col=get_patient_col(FLAGS.dataset_name),
         )
         _, _, aucs, _ = record_MIA_ROC_analysis(scores=scores, masks=masks)
         if FLAGS.dataset_name == "chexpert":
@@ -158,6 +169,7 @@ def main(argv):
         test_metric_means,
         color=[COLORS[model_name] for model_name in LOG_DIRS.keys()],
         yerr=test_metric_stds,
+        capsize=2,
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
     # axes[1].set_xticklabels(LOG_DIRS.keys(), rotation=45)

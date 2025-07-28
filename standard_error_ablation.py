@@ -1,12 +1,12 @@
 from functools import partial
 from pathlib import Path
 
-import joblib
-import matplotlib.pyplot as plt
+import joblib #type: ignore
+import matplotlib.pyplot as plt #type: ignore
 import numpy as np
-from absl import app, flags
-import pandas as pd
-from matplotlib.patches import Patch
+from absl import app, flags #type: ignore
+import pandas as pd #type: ignore
+from matplotlib.patches import Patch #type: ignore
 
 from src.data_utils.dataset_factory import get_dataset
 from src.data_utils.utils import get_dataset_str
@@ -180,19 +180,17 @@ def main(argv):
         axs.flat[i].boxplot(
             plot_data,
             tick_labels=None,
-            #showfliers=True,
-            #flierprops={"markersize":2, "alpha": 0.5},
             positions=positions-0.15,
-            medianprops={'color': 'black'}
+            medianprops={'color': 'black'},
+            showfliers=False,
         )
         bplot = axs.flat[i].boxplot(
             plot_data_nine_nine,
             tick_labels=None,
             patch_artist=True,
-            #showfliers=True,
-            #flierprops={"markersize":2, "alpha": 0.5},
             positions=positions+0.15,
-            medianprops={'color': 'black'}
+            medianprops={'color': 'black'},
+            showfliers=False,
         )
         for patch in bplot['boxes']:
             patch.set_facecolor("#fb887f")
@@ -212,6 +210,7 @@ def main(argv):
         ],
         loc="upper right",
         fontsize=FONT_SIZE,
+        frameon=False,
     )
     plt.savefig("./figs/standard_error_ablation.pdf", bbox_inches="tight")
 

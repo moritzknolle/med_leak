@@ -60,6 +60,9 @@ def prepare_dataset(
             f"... converting targets to np.float32"
         )
         targets = targets.astype(np.float32)
+    if batch_size > len(inputs):
+        print("... found batch size larger than dataset size, setting batch size to dataset size")
+        batch_size = len(inputs)
     if subset_indices is not None:
         print(f"... using {len(subset_indices)/len(inputs)*100:.1f}% subset of the dataset")
         inputs = inputs[subset_indices]
@@ -77,10 +80,6 @@ def prepare_dataset(
             lambda x, y: (aug_fn(x), y),
             num_parallel_calls=AUTOTUNE,
         )
-    input_shape = inputs.shape[1:]
-    padded_shapes = (input_shape, (targets.shape[1],))
-    # we use padded batching to ensure that all batches have the same shape (this avoids jit recompilation)
-    #ds = ds.padded_batch(batch_size=batch_size, padding_values=0.0, padded_shapes=padded_shapes)
     ds = ds.batch(batch_size=batch_size, drop_remainder=drop_remainder)
     return ds.prefetch(buffer_size=AUTOTUNE)
 
@@ -193,19 +192,25 @@ def train_and_eval(
     )
     # save a few random images to ./tmp for debugging purposes
     if track_data_stats:
-        tmp_dir = Path("./tmp/imgs")
-        tmp_dir.mkdir(exist_ok=True)
-        train_batch = next(iter(train_ds.take(1)))
-        test_batch = next(iter(test_ds.take(1)))
-        random_idcs = np.random.randint(0, train_batch[0].shape[0], size=15)
-        for i, idc in enumerate(random_idcs):
-            if train_batch[0].shape[-1] in [1,3]:
-                tf.keras.preprocessing.image.save_img(
-                    f"{tmp_dir}/train_{i}.png", train_batch[0][i]
-                )
-                tf.keras.preprocessing.image.save_img(
-                    f"{tmp_dir}/test_{i}.png", test_batch[0][i]
-                )
+        try:
+            tmp_dir = Path("./tmp/imgs")
+            tmp_dir.mkdir(exist_ok=True)
+            train_batch = next(iter(train_ds.take(1)))
+            test_batch = next(iter(test_ds.take(1)))
+            random_idcs = np.random.randint(0, train_batch[0].shape[0], size=15)
+            for i, idc in enumerate(random_idcs):
+                if train_batch[0].shape[-1] in [1,3]:
+                    tf.keras.preprocessing.image.save_img(
+                        f"{tmp_dir}/train_{i}.png", train_batch[0][i]
+                    )
+                    tf.keras.preprocessing.image.save_img(
+                        f"{tmp_dir}/test_{i}.png", test_batch[0][i]
+                    )
+        except Exception as e:
+            print(f"... error while saving images: {e}")
+            print(
+                "... skipping image saving, this is probably due to the dataset not being image-based"
+            )
     if overfit:
 
         def first_batch_only(dataset: tf.data.Dataset):

@@ -19,9 +19,9 @@ from src.train_utils.utils import (
 )
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 50, "Number of training steps.")
+flags.DEFINE_integer("epochs", 100, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 0.1, "Learning rate.")
-flags.DEFINE_float("weight_decay", 1e-3, "L2 weight decay.")
+flags.DEFINE_float("weight_decay", 1e-7, "L2 weight decay.")
 flags.DEFINE_float("momentum", 0.9, "Momentum parameter.")
 flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
@@ -29,7 +29,7 @@ flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & bia
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "tabresnet_275_6", "Name of the model to use.")
+flags.DEFINE_string("model", "tabresnet_300_6", "Name of the model to use.")
 flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup",

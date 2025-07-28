@@ -20,7 +20,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training epochs.")
 flags.DEFINE_float("learning_rate", 5e-3, "Learning rate.")
 flags.DEFINE_float("weight_decay", 1e-4, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 256, "Batch size.")
+flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
@@ -39,10 +39,9 @@ flags.DEFINE_float(
 flags.DEFINE_float("ema_decay", 0.99, "EMA decay.")
 flags.DEFINE_integer("grad_accum_steps", 0, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
-flags.DEFINE_enum(
+flags.DEFINE_string(
     "augment",
-    "weak",
-    ["trivial", "weak", "medium", "strong", "none"],
+    "none",
     "What type of data augmentations strength to apply.",
 )
 flags.DEFINE_list("img_size", [64, 64], "Image size.")
@@ -77,9 +76,8 @@ flags.DEFINE_string(
     "Path to logdir.",
 )
 flags.DEFINE_float("epsilon", 10.0, "Privacy budget epsilon for DP training.")
-flags.DEFINE_float("delta", 1e-5, "Privacy budget delta for DP training.")
 flags.DEFINE_float(
-    "clipping_norm", 0.5, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 1.0, "Clipping norm for DP training (gradient clipping)."
 )
 
 
@@ -101,7 +99,6 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-
     # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
@@ -124,7 +121,7 @@ def main(argv):
         )
         params = keras_api.DPKerasConfig(
             epsilon=FLAGS.epsilon,
-            delta=FLAGS.delta,
+            delta=1/len(train_dataset),
             clipping_norm=FLAGS.clipping_norm,
             batch_size=FLAGS.batch_size,
             gradient_accumulation_steps=1,
@@ -144,7 +141,7 @@ def main(argv):
             gradient_accumulation_steps=FLAGS.grad_accum_steps,
         )
         print(
-            f"DP training:{FLAGS.epsilon=} {FLAGS.delta=} {FLAGS.clipping_norm=} {FLAGS.batch_size=} "
+            f"DP training:{FLAGS.epsilon=} {FLAGS.clipping_norm=} {FLAGS.batch_size=} "
             f" {FLAGS.epochs=} {len(train_dataset)=}"
         )
         # compile model

@@ -1,5 +1,5 @@
-import keras
-from keras import ops, layers
+import keras #type: ignore
+from keras import ops, layers # type: ignore
 
 @keras.saving.register_keras_serializable()
 class ClassToken(layers.Layer):

@@ -1,13 +1,22 @@
 # implemented as described in Wang et al., "Time Series Classification from Scratch with Deep Neural Networks: A Strong Baseline", Data Mining and Knowledge Discovery, 2019
 
-import keras # type: ignore
+import keras  # type: ignore
 from typing import Tuple, Callable
 from functools import partial
-gn_16 = partial(keras.layers.GroupNormalization, axis=-1, groups=16, epsilon=1e-6, dtype="float32")
-bn_fn = partial(keras.layers.BatchNormalization, momentum=0.9, epsilon=1e-6, dtype="float32")
+
+gn_10 = partial(
+    keras.layers.GroupNormalization, axis=-1, groups=10, epsilon=1e-6, dtype="float32"
+)
+bn_fn = partial(
+    keras.layers.BatchNormalization, momentum=0.9, epsilon=1e-6, dtype="float32"
+)
+
 
 def build_1d_resnet(
-    input_shape: Tuple[int, int], nb_classes: int, nb_feature_maps: int = 64, norm: Callable = gn_16
+    input_shape: Tuple[int, int],
+    nb_classes: int,
+    nb_feature_maps: int = 64,
+    norm: Callable = bn_fn,
 ) -> keras.models.Model:
     input = keras.layers.Input(input_shape)
     # BLOCK 1
@@ -75,7 +84,12 @@ def build_1d_resnet(
 
 
 class ResNetBlock(keras.Model):
-    def __init__(self, width: int, dropout_rate: float = 0.1, norm: Callable = keras.layers.BatchNormalization):
+    def __init__(
+        self,
+        width: int,
+        dropout_rate: float = 0.1,
+        norm: Callable = gn_10,
+    ):
         super().__init__()
         self.dense_1 = keras.layers.Dense(width)
         self.dense_2 = keras.layers.Dense(width)
@@ -100,7 +114,12 @@ class ResNetBlock(keras.Model):
 
 
 def build_tabular_resnet(
-    input_shape: Tuple[int], num_classes:int=1, width: int = 300, depth: int = 5, dropout_rate: float = 0.1, norm: Callable = keras.layers.BatchNormalization
+    input_shape: Tuple[int],
+    num_classes: int = 1,
+    width: int = 300,
+    depth: int = 5,
+    dropout_rate: float = 0.1,
+    norm: Callable = gn_10,
 ):
     inputs = keras.Input(shape=input_shape)
     x = keras.layers.Dense(width)(inputs)

@@ -78,7 +78,7 @@ def stateless_random_rotate(img: tf.Tensor, seed: tf.Tensor, max_degrees=10):
         images=expanded_image,
         transforms=transform,
         output_shape=output_shape,
-        fill_mode="CONSTANT",
+        fill_mode="REFLECT",
         interpolation="BILINEAR",
     )
     return tf.squeeze(rotated_image, axis=0)

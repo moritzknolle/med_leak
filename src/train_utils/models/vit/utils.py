@@ -6,7 +6,7 @@ from http import client
 import io
 import numpy as np
 import scipy as sp
-import cv2
+import cv2 # type: ignore
 
 try:
     import PIL
