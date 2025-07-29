@@ -40,7 +40,7 @@ flags.DEFINE_integer("grad_accum_steps", 0, "Number of gradient accumulation ste
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_enum(
     "augment",
-    "weak",
+    "medium",
     ["trivial", "weak", "medium", "strong", "none"],
     "What type of data augmentations strength to apply.",
 )

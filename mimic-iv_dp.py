@@ -75,9 +75,9 @@ flags.DEFINE_string(
     "./logs/mimic-iv-ed/",
     "Path to logdir.",
 )
-flags.DEFINE_float("epsilon", 1e6, "Privacy budget parameter epsilon for DP training.")
+flags.DEFINE_float("epsilon", 1e5, "Privacy budget parameter epsilon for DP training.")
 flags.DEFINE_float(
-    "clipping_norm", 10.0, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 20.0, "Clipping norm for DP training (gradient clipping)."
 )
 
 

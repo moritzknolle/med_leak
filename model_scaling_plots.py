@@ -36,10 +36,10 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset.")
+flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
-    "ylim_upper", 0.925, "upper y-limit for test performance metric plot"
+    "ylim_upper", 0.935, "upper y-limit for test performance metric plot"
 )
 flags.DEFINE_float("ylim_lower", 0.8, "lower y-limit for test performance metric plot")
 
@@ -47,7 +47,7 @@ FITZ_LOG_DIRS = {
     "CNN": "./logs/fitzpatrick/small_cnn",
     "WRN_28_2": "./logs/fitzpatrick/wrn_28_2",
     "WRN_28_5": "./logs/fitzpatrick/wrn_28_5",
-    "VIT-B/16": "./logs/fitzpatrick/vit_b_16",
+    "VIT-B/16": "./logs/fitzpatrick/vit_b_16_128x128",
 }
 COLORS = {
     "CNN": "#bed3f7",
@@ -166,7 +166,7 @@ def main(argv):
     # axes[1].set_xticklabels(LOG_DIRS.keys(), rotation=45)
     axes[1].set_xticklabels([])
     axes[1].set_xlabel("Model")
-    axes[1].set_ylabel("Average Test AUC")
+    axes[1].set_ylabel("Diagnostic Performance")
     axes[1].grid(False)
     axes[1].set_ylim((FLAGS.ylim_lower, FLAGS.ylim_upper))
     axes[0].legend(loc="upper right", framealpha=0.5)
