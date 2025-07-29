@@ -1,0 +1,19 @@
+program: mimic-iv_dp.py
+method: grid
+project: mimic-iv_dp
+metric:
+  name: _val_auc
+  goal: maximize
+parameters:
+  clipping_norm:
+    values: [0.5, 1.0, 2.0, 5.0, 10.0, 12.5, 15.0, 17.5, 20.0, 25.0, 30.0, 50.0, 100.0]
+  weight_decay:
+    value: 0.0
+  eval_only:
+    value: True
+  log_wandb:
+    value: True
+early_terminate:
+  type: hyperband
+  s: 10
+  min_iter: 1_000

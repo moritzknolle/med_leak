@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Callable, List, Tuple
 
-import keras
+import keras # type: ignore
 
 # adapted from https://github.com/google/objax/blob/master/objax/zoo/wide_resnet.py
 

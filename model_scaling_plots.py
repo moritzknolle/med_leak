@@ -3,7 +3,7 @@ import os
 from functools import partial
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt #type: ignore
 import numpy as np
 import scipy
 from absl import app, flags
@@ -16,8 +16,6 @@ from src.privacy_utils.utils import convert_patientmask_to_recordmask
 from src.privacy_utils.lira import (
     compute_scores,
     loss_logit_transform_multiclass,
-    loss_logit_transform_multilabel,
-    perform_lira,
     record_MIA_ROC_analysis,
 )
 
@@ -38,7 +36,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset.")
+flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset.")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.925, "upper y-limit for test performance metric plot"
@@ -51,23 +49,17 @@ FITZ_LOG_DIRS = {
     "WRN_28_5": "./logs/fitzpatrick/wrn_28_5",
     "VIT-B/16": "./logs/fitzpatrick/vit_b_16",
 }
-FITZ_COLORS = {
+COLORS = {
     "CNN": "#bed3f7",
     "WRN_28_2": "#6F9CEB",
     "WRN_28_5": "#306bac",
-    "VIT-B/16": "#232a6f",
+    "VIT-B/16": "#1C3762",
 }
 CHEX_LOGDIRS = {
     "CNN": "./logs/chexpert/small_cnn",
     "WRN_28_2": "./logs/chexpert/wrn_28_2",
     "WRN_28_5": "./logs/chexpert/wrn_28_5",
     "VIT-B/16": "./logs/chexpert/vit_b_16",
-}
-CHEX_COLORS = {
-    "CNN": "#bed3f7",
-    "WRN_28_2": "#6F9CEB",
-    "WRN_28_5": "#306bac",
-    "VIT-B/16": "#232a6f",
 }
 
 
@@ -108,7 +100,6 @@ def main(argv):
         save_root=Path(FLAGS.save_root),
         data_root=Path(""),
     )
-    COLORS = CHEX_COLORS if FLAGS.dataset_name == "chexpert" else FITZ_COLORS
     LOG_DIRS = CHEX_LOGDIRS if FLAGS.dataset_name == "chexpert" else FITZ_LOG_DIRS
     test_metric_name = (
         "_val_macro_auroc(cxp)" if FLAGS.dataset_name == "chexpert" else "_val_auroc"
