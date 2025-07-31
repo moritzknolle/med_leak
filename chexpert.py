@@ -18,7 +18,7 @@ from src.train_utils.utils import MyCosineDecay, get_aug_fn, grayscale_to_rgb
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 60, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 1.0, "Learning rate.")
-flags.DEFINE_float("weight_decay", 1e-5, "L2 weight decay.")
+flags.DEFINE_float("weight_decay", 1e-4, "L2 weight decay.")
 flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")

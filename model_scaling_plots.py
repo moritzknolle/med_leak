@@ -47,7 +47,7 @@ FITZ_LOG_DIRS = {
     "CNN": "./logs/fitzpatrick/small_cnn",
     "WRN_28_2": "./logs/fitzpatrick/wrn_28_2",
     "WRN_28_5": "./logs/fitzpatrick/wrn_28_5",
-    "VIT-B/16": "./logs/fitzpatrick/vit_b_16_128x128",
+    "VIT-B/16": "./logs/fitzpatrick/vit_b_16",
 }
 COLORS = {
     "CNN": "#bed3f7",

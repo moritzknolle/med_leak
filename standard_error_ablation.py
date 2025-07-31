@@ -176,13 +176,14 @@ def main(argv):
             # standard error for records in the 99th percentile
             plot_data_nine_nine.append(se_aucs[aucs >= auc_cutoff])
         positions=np.arange(len(FLAGS.n_models_each))
-        axs.flat[i].axhline(y=0.05, color="black", linestyle="--", linewidth=1, alpha=0.5)
+        axs.flat[i].axhline(y=0.05, color="black", linestyle="--", linewidth=1, alpha=0.5, zorder=0)
         axs.flat[i].boxplot(
             plot_data,
             tick_labels=None,
             positions=positions-0.15,
             medianprops={'color': 'black'},
             showfliers=False,
+            zorder=1,
         )
         bplot = axs.flat[i].boxplot(
             plot_data_nine_nine,
@@ -191,6 +192,7 @@ def main(argv):
             positions=positions+0.15,
             medianprops={'color': 'black'},
             showfliers=False,
+            zorder=1,
         )
         for patch in bplot['boxes']:
             patch.set_facecolor("#fb887f")

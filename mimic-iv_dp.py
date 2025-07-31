@@ -21,9 +21,8 @@ from src.train_utils.utils import (
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
-flags.DEFINE_float("learning_rate", 0.25, "Learning rate.")
+flags.DEFINE_float("learning_rate", 5e-4, "Learning rate.")
 flags.DEFINE_float("weight_decay", 1e-3, "L2 weight decay.")
-flags.DEFINE_float("momentum", 0.9, "Momentum parameter.")
 flags.DEFINE_integer("batch_size", 8192, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
@@ -132,11 +131,10 @@ def main(argv):
         )
         print(params)
         model = keras_api.make_private(model, params)
-        opt = keras.optimizers.SGD(
+        opt = keras.optimizers.Adam(
             learning_rate=(
                 schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
             ),
-            momentum=FLAGS.momentum,
             weight_decay=FLAGS.weight_decay,
             use_ema=FLAGS.ema,
             ema_momentum=FLAGS.ema_decay,
