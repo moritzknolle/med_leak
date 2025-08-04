@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --ntasks=4
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-task=1
 #SBATCH --job-name=fitzpatrick_wrn_28_2
 #SBATCH --output=slurm_out/%j-%x-%t.out
