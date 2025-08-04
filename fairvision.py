@@ -1,4 +1,4 @@
-import os
+import os, gc
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -176,6 +176,9 @@ def main(argv):
                     log_wandb=FLAGS.log_wandb,
                     wandb_project_name="fairvision",
                 )
+                del compiled_model
+                keras.backend.clear_session()
+                gc.collect()   
             except StopIteration:
                 break
 

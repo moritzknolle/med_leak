@@ -22,7 +22,7 @@ def get_small_cnn(
         kernel_initializer="he_normal",
         bias_initializer="zeros",
     )
-    norm = partial(keras.layers.GroupNormalization, groups=base_filters//2, dtype="float32")
+    norm = partial(keras.layers.BatchNormalization, dtype="float32")
     inputs = keras.Input(shape=(img_size[0], img_size[1], in_channels))
     x = inputs
     x = conv(base_filters)(x)

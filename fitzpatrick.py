@@ -185,6 +185,7 @@ def main(argv):
                     wandb_project_name="fitzpatrick",
                 )
                 del model
+                keras.backend.clear_session()
                 gc.collect()
             except StopIteration:
                 break

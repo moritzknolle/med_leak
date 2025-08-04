@@ -1,4 +1,4 @@
-import os
+import os, gc
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -167,8 +167,8 @@ def main(argv):
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
         return callbacks
 
-    model = get_compiled_model()
     if FLAGS.eval_only:
+        model = get_compiled_model()
         model, _, _, _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
@@ -187,6 +187,7 @@ def main(argv):
     else:
         while True:
             try:
+                model = get_compiled_model()
                 train_random_subset(
                     compiled_model=model,
                     train_dataset=train_dataset,
@@ -207,7 +208,9 @@ def main(argv):
                     log_wandb=FLAGS.log_wandb,
                     wandb_project_name="mimic",
                 )
-                model = get_compiled_model()
+                del model
+                keras.backend.clear_session()
+                gc.collect()
             except StopIteration:
                 break
 
