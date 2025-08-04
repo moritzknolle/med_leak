@@ -22,5 +22,5 @@ srun python chexpert.py \
     --model='small_cnn' \
     --learning_rate=0.1 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
-    --ckpt_file_path="/dss/dssmcmlfs01/pn73mu/pn73mu-dss-0000/moritz/ckpts" \
+    --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
     --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/small_cnn" \
