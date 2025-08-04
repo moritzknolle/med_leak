@@ -126,7 +126,7 @@ def train_and_eval(
     wandb_project_name: str = "",
     log_wandb: bool = False,
     verbose: bool = True,
-) -> Tuple[keras.Model, dict, dict, bool]:
+) -> Tuple[keras.Model, dict, dict, dict, bool]:
     """
     Train and evaluate a model using the given datasets and training parameters.
 
@@ -279,16 +279,22 @@ def train_and_eval(
         print(f"... deleting checkpoint file: {ckpt_file_path}")
         del ckpt_callback
         os.remove(ckpt_file_path)
+    train_metrics = compiled_model.evaluate(
+        train_ds, verbose=verbose, return_dict=True
+    )
     test_metrics = compiled_model.evaluate(
         test_ds, verbose=verbose, return_dict=True
     )
     print(f"... test metrics: {test_metrics}")
     if log_wandb:
+        train_metrics = {f"_{k}": v for k, v in train_metrics.items()} | {
+            "training_time": training_time
+        }
         test_metrics = {f"_val_{k}": v for k, v in test_metrics.items()} | {
             "training_time": training_time
         }
         wandb.log(test_metrics)
-    return compiled_model, training_history, test_metrics, failed
+    return compiled_model, training_history, train_metrics, test_metrics, failed
 
 
 def generate_masks(
@@ -470,7 +476,7 @@ def train_random_subset(
     )
     exception_raised = False
     try:
-        compiled_model, training_history, eval_metrics, run_failed = train_and_eval(
+        compiled_model, training_history, train_metrics, test_metrics, run_failed = train_and_eval(
             compiled_model=compiled_model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,
@@ -540,13 +546,14 @@ def train_random_subset(
             else:
                 train_logit_arr = compiled_model.predict(train_ds)
                 test_logit_arr = compiled_model.predict(test_ds)
-            print(train_logit_arr.shape, test_logit_arr.shape)
+            print(f"... saving logits to disk train={train_logit_arr.shape} and test={test_logit_arr.shape}")
             success = logger.log(
                 train_logits=train_logit_arr,
                 train_labels=train_dataset.targets,
-                eval_logits=test_logit_arr,
-                eval_labels=test_dataset.targets,
-                metrics=eval_metrics,
+                test_logits=test_logit_arr,
+                test_labels=test_dataset.targets,
+                train_metrics=train_metrics,
+                test_metrics=test_metrics,
             )
             if success:
                 # add current index to completed indices

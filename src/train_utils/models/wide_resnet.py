@@ -7,7 +7,20 @@ import keras # type: ignore
 
 BN_MOM = 0.9
 BN_EPS = 1e-5
+bn = partial(
+            keras.layers.BatchNormalization,
+            momentum=BN_MOM,
+            epsilon=BN_EPS,
+            dtype="float32",
+        )
+gn_16 = partial(
+            keras.layers.GroupNormalization,
+            groups=16,
+            axis=-1,
+            dtype="float32",
+        )
 
+NORM_DEFAULT = gn_16
 
 def conv_args(kernel_size: int, nout: int):
     """Returns a list of arguments which are common to all convolutions.
@@ -36,12 +49,7 @@ class WRNBlock(keras.layers.Layer):
         nout: int,
         stride: int = 1,
         dropout: float = 0.0,
-        norm: Callable = partial(
-            keras.layers.BatchNormalization,
-            momentum=BN_MOM,
-            epsilon=BN_EPS,
-            dtype="float32",
-        ),
+        norm: Callable = NORM_DEFAULT,
         act: Callable = keras.activations.relu,
     ):
         """Creates WRNBlock instance.
@@ -50,7 +58,7 @@ class WRNBlock(keras.layers.Layer):
             nin: number of input filters.
             nout: number of output filters.
             stride: stride for convolution and projection convolution in this block.
-            norm: module which used as batch norm function.
+            norm: module which used as normalisation function.
         """
         super().__init__()
         if nin != nout or stride > 1:
@@ -88,12 +96,7 @@ def get_wrn_general(
     img_size: Tuple[int,int],
     blocks_per_group: List[int],
     width: int,
-    norm: Callable = partial(
-        keras.layers.BatchNormalization,
-        momentum=BN_MOM,
-        epsilon=BN_EPS,
-        dtype="float32",
-    ),
+    norm: Callable = NORM_DEFAULT,
     act: Callable = keras.activations.relu,
     dropout: float = 0.0,
 ):
@@ -104,7 +107,7 @@ def get_wrn_general(
         nclass: number of output classes.
         blocks_per_group: number of blocks in each block group.
         width: multiplier to the number of convolution filters.
-        norm: module which used as batch norm function.
+        norm: module which used as normalisation function.
     """
     widths = [
         int(v * width) for v in [16 * (2**i) for i in range(len(blocks_per_group))]
@@ -139,13 +142,8 @@ def get_wide_resnet(
     num_classes: int = 10,
     depth: int = 28,
     width: int = 2,
-    norm: Callable = partial(
-        keras.layers.BatchNormalization,
-        momentum=BN_MOM,
-        epsilon=BN_EPS,
-        dtype="float32",
-    ),
-    act: str = "relu",
+    norm: Callable = NORM_DEFAULT,
+    act: str = "leaky_relu",
     dropout: float = 0.0,
 ):
     """Creates a WideResNet Model instance.
@@ -156,7 +154,7 @@ def get_wide_resnet(
         num_classes: number of output classes.
         depth: number of convolution layers. (depth-4) should be divisible by 6
         width: multiplier to the number of convolution filters.
-        norm: module which used as batch norm function.
+        norm: module which used as normalisation function.
     """
     assert (depth - 4) % 6 == 0, "depth should be 6n+4"
     n = (depth - 4) // 6

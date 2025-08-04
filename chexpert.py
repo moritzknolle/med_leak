@@ -93,9 +93,12 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-    imagenet_weights = (
-        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-    )
+    if len(FLAGS.model.split("_"))>1:
+        imagenet_weights = (
+            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+        )
+    else:
+        imagenet_weights = False
     # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
@@ -160,7 +163,7 @@ def main(argv):
 
     model = get_compiled_model()
     if FLAGS.eval_only:
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,

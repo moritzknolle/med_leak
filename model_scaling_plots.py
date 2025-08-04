@@ -36,7 +36,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
+flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.935, "upper y-limit for test performance metric plot"

@@ -18,23 +18,42 @@ def get_small_cnn(
         keras.layers.Conv2D,
         kernel_size=(3, 3),
         padding="same",
-        activation=act,
+        activation=None,
         kernel_initializer="he_normal",
         bias_initializer="zeros",
     )
+    norm = partial(keras.layers.BatchNormalization, dtype="float32")
     inputs = keras.Input(shape=(img_size[0], img_size[1], in_channels))
     x = inputs
     x = conv(base_filters)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters * 2)(x)
+    x = norm()(x)
+    x = act(x)
     x = keras.layers.MaxPooling2D((2, 2))(x)
     x = conv(base_filters * 2)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters * 2)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters * 4)(x)
+    x = norm()(x)
+    x = act(x)
     x = keras.layers.MaxPooling2D((2, 2))(x)
     x = conv(base_filters * 4)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters * 4)(x)
+    x = norm()(x)
+    x = act(x)
     x = conv(base_filters * 8)(x)
+    x = norm()(x)
+    x = act(x)
     x = keras.layers.MaxPooling2D((2, 2))(x)
     x = conv(num_classes, dtype="float32")(x)
     outputs = keras.layers.GlobalAveragePooling2D()(x)

@@ -4,7 +4,7 @@
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
-#SBATCH --job-name=fitzpatrick_wrn_28_5
+#SBATCH --job-name=fitzpatrick_wrn_40_4
 #SBATCH --output=slurm_out/%j-%x-%t.out
 #SBATCH --mem-per-gpu=50g
 #SBATCH -p mcml-dgx-a100-40x8
@@ -22,4 +22,4 @@ srun python fitzpatrick.py \
     --model='wrn_28_5' \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn73mu/pn73mu-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/wrn_28_5" \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/wrn_40_4" \

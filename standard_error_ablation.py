@@ -89,7 +89,7 @@ FLAGS = flags.FLAGS
 
 def main(argv):
     np.random.seed(FLAGS.seed)
-    fig, axs = plt.subplots(2, 4, figsize=(6.29, 3.75), sharey="row")
+    fig, axs = plt.subplots(2, 4, figsize=(7.2, 3.75), sharey=True)
     # load empirical sampling distributions IN/OUT for all datasets and log directories
     for i, (dataset_name, logdir) in enumerate(LOGDIRS.items()):
         train_dataset, _ = get_dataset(
@@ -194,16 +194,43 @@ def main(argv):
             showfliers=False,
             zorder=1,
         )
+        # compute IQRs
+        iqr = [(np.percentile(data, 75)-np.percentile(data, 25)) for data in plot_data]
+        iqr_nine_nine = [(np.percentile(data, 75)-np.percentile(data, 25)) for data in plot_data_nine_nine]
+        # plot small colored dot above boxes where the box color is otherwise not visible because the box (IQR) is too small
+        for j, val in enumerate(iqr):
+            if val < 0.004:  # if the box is too small, plot a dot above the upper whisker
+                height = np.median(plot_data[j]) + 0.01
+                axs.flat[i].plot(
+                    positions[j] - 0.15,
+                    height,
+                    marker="s",
+                    color="white",
+                    markeredgecolor="black",
+                    markersize=3,
+                )
+        for j, val in enumerate(iqr_nine_nine):
+            if val < 0.004:  # if the box is too small, plot a dot above the upper whisker
+                height = np.median(plot_data_nine_nine[j]) + 0.01
+                axs.flat[i].plot(
+                    positions[j] + 0.15,
+                    height,
+                    marker="s",
+                    color="#fb887f",
+                    markeredgecolor="black",
+                    markersize=3,
+                )
         for patch in bplot['boxes']:
             patch.set_facecolor("#fb887f")
         axs.flat[i].set_title(
             get_dataset_str(dataset_name),
             fontsize=FONT_SIZE,
         )
-        fig.supylabel("Standar Error", fontsize=FONT_SIZE)
-        fig.supxlabel("Numer of Target Models", fontsize=FONT_SIZE)
+        fig.supylabel("Standard Error", fontsize=FONT_SIZE)
+        fig.supxlabel("Number of Target Models", fontsize=FONT_SIZE)
         axs.flat[i].set_xticks(positions, labels=[n*2 for n in FLAGS.n_models_each])
         axs.flat[i].spines[["right", "top"]].set_visible(False)
+        #axs.flat[i].set_ylim(-0.02, 0.15)
     axs.flat[-1].axis("off")
     axs.flat[-1].legend(
         handles=[
