@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
-#SBATCH --ntasks=4
+#SBATCH --gres=gpu:8
+#SBATCH --ntasks=8
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
 #SBATCH --job-name=chexpert_wrn_28_2
