@@ -22,8 +22,8 @@ from src.train_utils.utils import (
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 5e-4, "Learning rate.")
-flags.DEFINE_float("weight_decay", 1e-3, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 8192, "Batch size.")
+flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
+flags.DEFINE_integer("batch_size", 16_384, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
@@ -74,10 +74,12 @@ flags.DEFINE_string(
     "./logs/mimic-iv-ed/",
     "Path to logdir.",
 )
-flags.DEFINE_float("epsilon", 1e5, "Privacy budget parameter epsilon for DP training.")
+flags.DEFINE_float("epsilon", np.inf, "Privacy budget parameter epsilon for DP training.")
 flags.DEFINE_float(
-    "clipping_norm", 20.0, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 5.0, "Clipping norm for DP training (gradient clipping)."
 )
+flags.DEFINE_bool("dp", True, "Whether to apply differential privacy.")
+
 
 
 def main(argv):
@@ -95,8 +97,6 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=True,
     )
-    
-    # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         train_size = len(train_dataset)
@@ -119,19 +119,21 @@ def main(argv):
             steps=int(FLAGS.decay_steps * STEPS),
             relative_lr_warmup_steps=FLAGS.lr_warmup,
         )
-        params = keras_api.DPKerasConfig(
-            epsilon=FLAGS.epsilon,
-            delta=1/train_size,
-            clipping_norm=FLAGS.clipping_norm,
-            batch_size=FLAGS.batch_size,
-            gradient_accumulation_steps=1,
-            train_steps=STEPS,
-            train_size=train_size,
-            seed=FLAGS.seed,
-        )
-        print(params)
-        model = keras_api.make_private(model, params)
-        opt = keras.optimizers.Adam(
+        if FLAGS.dp:
+            params = keras_api.DPKerasConfig(
+                epsilon=FLAGS.epsilon,
+                delta=1/train_size,
+                clipping_norm=FLAGS.clipping_norm,
+                batch_size=FLAGS.batch_size,
+                gradient_accumulation_steps=1,
+                train_steps=STEPS,
+                train_size=train_size,
+                seed=FLAGS.seed,
+                value_discretization_interval=1e-12,
+            )
+            print(params)
+            model = keras_api.make_private(model, params)
+        opt = keras.optimizers.AdamW(
             learning_rate=(
                 schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
             ),
@@ -159,7 +161,7 @@ def main(argv):
 
     if FLAGS.eval_only:
         model = get_compiled_model()
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,

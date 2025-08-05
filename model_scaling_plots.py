@@ -36,7 +36,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
+flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.935, "upper y-limit for test performance metric plot"
@@ -44,21 +44,21 @@ flags.DEFINE_float(
 flags.DEFINE_float("ylim_lower", 0.8, "lower y-limit for test performance metric plot")
 
 FITZ_LOG_DIRS = {
-    "CNN": "./logs/fitzpatrick/small_cnn",
     "WRN_28_2": "./logs/fitzpatrick/wrn_28_2",
-    "WRN_28_5": "./logs/fitzpatrick/wrn_28_5",
+    "WRN_40_4": "./logs/fitzpatrick/wrn_40_4",
     "VIT-B/16": "./logs/fitzpatrick/vit_b_16",
+    "VIT-L/16": "./logs/fitzpatrick/vit_l_16",
 }
 COLORS = {
-    "CNN": "#bed3f7",
-    "WRN_28_2": "#6F9CEB",
-    "WRN_28_5": "#306bac",
-    "VIT-B/16": "#1C3762",
+    "WRN_28_2": "#bed3f7",
+    "WRN_40_4": "#6F9CEB",
+    "VIT-B/16": "#306bac",
+    "VIT-L/16": "#1C3762",
 }
 CHEX_LOGDIRS = {
     "CNN": "./logs/chexpert/small_cnn",
     "WRN_28_2": "./logs/chexpert/wrn_28_2",
-    "WRN_28_5": "./logs/chexpert/wrn_28_5",
+    "WRN_40_4": "./logs/chexpert/wrn_40_4",
     "VIT-B/16": "./logs/chexpert/vit_b_16",
 }
 
@@ -70,23 +70,23 @@ def get_perf_from_json(log_dir: Path, metric_name: str = "accuracy"):
         try:
             with open(subdir / "info.json", "r") as f:
                 metrics = json.load(f)
-                eval_metrics = metrics["eval_metrics"]
-                for m_name, _ in eval_metrics.items():
+                test_metrics = metrics["test_metrics"]
+                for m_name, _ in test_metrics.items():
                     contains_numb = any(char.isdigit() for char in metric_name)
                     if contains_numb:
                         m_name_fixed = "_".join(
                             m_name.split("_")[-1]
                         )  # get rid off annoying number suffix that keras sometimes adds to metric names
-                        metrics["eval_metrics"][m_name_fixed] = metrics[
-                            "eval_metrics"
+                        metrics["test_metrics"][m_name_fixed] = metrics[
+                            "test_metrics"
                         ].pop(m_name)
-                metric_vals.append(metrics["eval_metrics"][metric_name])
+                metric_vals.append(metrics["test_metrics"][metric_name])
         except Exception as e:
             print(f"Encountered error loading {metric_name} from info.json: {e}")
             continue
     assert len(metric_vals) == len(
         valid_dirs
-    ), f"Found {len(metric_vals)} values for {metric_name} but expected {len(valid_dirs)} \n found keys: {eval_metrics.keys()}"
+    ), f"Found {len(metric_vals)} values for {metric_name} but expected {len(valid_dirs)} \n found keys: {test_metrics.keys()}"
     return metric_vals
 
 

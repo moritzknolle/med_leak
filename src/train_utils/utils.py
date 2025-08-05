@@ -3,12 +3,11 @@ from enum import Enum
 from functools import partial
 from typing import Callable, List, Optional
 
-import cv2
-import keras
+import keras # type: ignore
 import numpy as np
-import tensorflow as tf
-from keras import ops
-from keras.optimizers.schedules import LearningRateSchedule
+import tensorflow as tf # type: ignore
+from keras import ops # type: ignore
+from keras.optimizers.schedules import LearningRateSchedule # type: ignore
 
 import wandb
 

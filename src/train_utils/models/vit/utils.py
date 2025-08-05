@@ -6,7 +6,6 @@ from http import client
 import io
 import numpy as np
 import scipy as sp
-import cv2 # type: ignore
 
 try:
     import PIL
@@ -16,39 +15,6 @@ except ImportError:  # pragma: no cover
 
 ImageInputType = typing.Union[str, np.ndarray, "PIL.Image.Image", io.BytesIO]
 
-
-def read(filepath_or_buffer: ImageInputType, size, timeout=None):
-    """Read a file into an image object
-    Args:
-        filepath_or_buffer: The path to the file or any object
-            with a `read` method (such as `io.BytesIO`)
-        size: The size to resize the image to.
-        timeout: If filepath_or_buffer is a URL, the timeout to
-            use for making the HTTP request.
-    """
-    if PIL is not None and isinstance(filepath_or_buffer, PIL.Image.Image):
-        return np.array(filepath_or_buffer.convert("RGB"))
-    if isinstance(filepath_or_buffer, (io.BytesIO, client.HTTPResponse)):
-        image = np.asarray(bytearray(filepath_or_buffer.read()), dtype=np.uint8)
-        image = cv2.imdecode(image, cv2.IMREAD_UNCHANGED)
-    elif isinstance(filepath_or_buffer, str):
-        with request.urlopen(filepath_or_buffer, timeout=timeout) as r:
-            return read(r, size=size)
-    else:
-        if not os.path.isfile(typing.cast(str, filepath_or_buffer)):
-            raise FileNotFoundError(
-                "Could not find image at path: " + filepath_or_buffer
-            )
-        image = cv2.imread(filepath_or_buffer)
-    if image is None:
-        raise ValueError(f"An error occurred reading {filepath_or_buffer}.")
-    # We use cvtColor here instead of just ret[..., ::-1]
-    # in order to ensure that we provide a contiguous
-    # array for later processing. Some hashers use ctypes
-    # to pass the array and non-contiguous arrays can lead
-    # to erroneous results.
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return cv2.resize(image, (size, size))
 
 
 def apply_embedding_weights(target_layer, source_weights, num_x_patches, num_y_patches):

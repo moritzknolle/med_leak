@@ -1,0 +1,24 @@
+program: mimic-iv_dp.py
+name: 'eps_100'
+method: random
+project: mimic-iv
+metric:
+  name: _val_auc
+  goal: maximize
+parameters:
+  learning_rate:
+    distribution: log_uniform
+    min: -5
+    max: -2
+  epochs:
+    values: [25, 50, 75, 100, 150, 200, 300]  
+  epsilon:
+    value: 100
+  eval_only:
+    value: True
+  log_wandb:
+    value: True
+early_terminate:
+  type: hyperband
+  s: 10
+  min_iter: 1_000
