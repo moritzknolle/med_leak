@@ -2,12 +2,12 @@
 #SBATCH -N 1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks=4
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
-#SBATCH --job-name=fitzpatrick_vit_b_16
+#SBATCH --job-name=chexpert_vit_l_16
 #SBATCH --output=slurm_out/%j-%x-%t.out
 #SBATCH --mem-per-gpu=50g
-#SBATCH -p mcml-dgx-a100-40x8
+#SBATCH -p mcml-hgx-a100-80x4
 #SBATCH -q mcml
 #SBATCH -t 2-00:00:00
 
@@ -16,10 +16,11 @@ conda deactivate
 conda activate keras
 echo 'Opened virtual environment'
 
-srun python fitzpatrick.py \
+srun python chexpert.py \
     --eval_only=False \
     --n_runs=200 \
-    --model='vit_b_16' \
+    --model='vit_l_16' \
+    --img_size=128,128  \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_b_16" \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/vit_l_16" \

@@ -4,7 +4,7 @@
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-task=1
-#SBATCH --job-name=fitzpatrick_vit_b_16
+#SBATCH --job-name=fitzpatrick_vit_l_16
 #SBATCH --output=slurm_out/%j-%x-%t.out
 #SBATCH --mem-per-gpu=50g
 #SBATCH -p mcml-dgx-a100-40x8
@@ -19,7 +19,7 @@ echo 'Opened virtual environment'
 srun python fitzpatrick.py \
     --eval_only=False \
     --n_runs=200 \
-    --model='vit_b_16' \
+    --model='vit_l_16' \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_b_16" \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_l_16" \
