@@ -12,6 +12,8 @@ parameters:
     max: -2
   epochs:
     values: [25, 50, 75, 100, 150, 200, 300]  
+  save_root:
+    value: "/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy"
   epsilon:
     value: 100
   eval_only:

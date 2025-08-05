@@ -1,5 +1,5 @@
 program: mimic-iv_dp.py
-name: 'eps_1000'
+name: 'eps_10'
 method: random
 project: mimic-iv
 metric:
@@ -11,11 +11,11 @@ parameters:
     min: -5
     max: -2
   epochs:
-    values: [25, 50, 75, 100, 150, 200, 300]
+    values: [25, 50, 75, 100, 150, 200, 300]  
   save_root:
     value: "/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy"
   epsilon:
-    value: 1000
+    value: 10
   eval_only:
     value: True
   log_wandb:
