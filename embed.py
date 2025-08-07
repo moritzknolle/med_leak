@@ -107,8 +107,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=IMG_SIZE,
-            in_channels=1,
+            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1),
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
         )
@@ -146,7 +145,7 @@ def main(argv):
 
     if FLAGS.eval_only:
         model = get_compiled_model()
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,

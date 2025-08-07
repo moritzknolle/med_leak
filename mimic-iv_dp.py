@@ -29,8 +29,8 @@ flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & bia
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "tabresnet_300_6", "Name of the model to use.")
-flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
+flags.DEFINE_string("model", "tabresnet_100_3", "Name of the model to use.")
+flags.DEFINE_enum("lr_schedule", "constant", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup",
     0.05,
@@ -41,7 +41,7 @@ flags.DEFINE_float(
     1.0,
     "Relative fraction of total steps until learning rate is decayed to 1/10 times the original value. A value smaller than one means faster decay and likewise a bigger value leads to slower decay.",
 )
-flags.DEFINE_float("ema_decay", 0.995, "EMA decay.")
+flags.DEFINE_float("ema_decay", 0.9995, "EMA decay.")
 flags.DEFINE_integer("grad_accum_steps", 2, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_boolean(
@@ -76,7 +76,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_float("epsilon", np.inf, "Privacy budget parameter epsilon for DP training.")
 flags.DEFINE_float(
-    "clipping_norm", 5.0, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 10.0, "Clipping norm for DP training (gradient clipping)."
 )
 flags.DEFINE_bool("dp", True, "Whether to apply differential privacy.")
 
@@ -108,8 +108,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=None,
-            in_channels=64,
+            input_shape=(64,),
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
             preprocessing_func=None,

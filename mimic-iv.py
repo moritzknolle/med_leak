@@ -17,6 +17,7 @@ from src.train_utils.utils import (
     MyCosineDecay,
     get_aug_fn,
 )
+from src.train_utils.dp import DPSequential, DPModel
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
@@ -94,19 +95,30 @@ def main(argv):
     
     # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
-        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        n_train = len(train_dataset)
     else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+        n_train = int(len(train_dataset) * FLAGS.subset_ratio)
+    STEPS = n_train // FLAGS.batch_size * FLAGS.epochs
 
     def get_compiled_model():
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=None,
-            in_channels=64,
+            input_shape=(64,),
+            batch_size=FLAGS.batch_size,
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
             preprocessing_func=None,
+        )
+        print("SUMMARY", model.summary())
+        print(model.inputs, model.outputs)
+        model = DPModel(
+            inputs=model.inputs,
+            outputs=model.outputs,
+            l2_clip_norm=100.0,
+            noise_multiplier=0.0,
+            batch_size=FLAGS.batch_size,
+            n_train=n_train,
         )
         schedule = MyCosineDecay(
             base_lr=FLAGS.learning_rate,
