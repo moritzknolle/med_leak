@@ -1,12 +1,12 @@
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Optional
 
 import keras # type: ignore
 
 
 def get_small_cnn(
-    img_size: Tuple[int, int] = (32, 32),
-    in_channels: int = 3,
+    input_shape: Tuple[int, ...] = (64, 64, 1),
+    batch_size: Optional[int] = None,
     num_classes: int = 10,
     base_filters: int = 32,
 ):
@@ -23,7 +23,7 @@ def get_small_cnn(
         bias_initializer="zeros",
     )
     norm = partial(keras.layers.BatchNormalization, dtype="float32")
-    inputs = keras.Input(shape=(img_size[0], img_size[1], in_channels))
+    inputs = keras.Input(shape=input_shape, batch_size=batch_size)
     x = inputs
     x = conv(base_filters)(x)
     x = norm()(x)

@@ -11,9 +11,9 @@ from .resnet_1d import build_1d_resnet, build_tabular_resnet
 
 def get_model(
     model_name: str,
-    img_size: Tuple[int, int],
-    in_channels: int,
+    input_shape: Tuple[int, ...],
     num_classes: int,
+    batch_size: Optional[int] = None,
     dropout=0.0,
     preprocessing_func: Optional[Callable] = None,
 ):
@@ -21,8 +21,7 @@ def get_model(
     Helper function that returns a function which creates the respective model given the model name.
     Args:
         model_name: str, name of the model
-        img_size: int, size of the input image
-        in_channels: int, number of channels of the input image
+        input_shape: Tuple[int, ...], shape of the input
         num_classes: int, number of classes
         dropout: float, dropout rate
         preprocessing_func: callable, preprocessing function to apply to the input image. Only effective for ViT models.
@@ -33,7 +32,7 @@ def get_model(
         if dropout != 0.0:
             raise ValueError("Small CNN does not support dropout")
         model = get_small_cnn(
-            img_size=img_size, in_channels=in_channels, num_classes=num_classes
+            input_shape=input_shape, num_classes=num_classes
         )
     elif model_name.split("_")[0] == "wrn":
         depth = int(model_name.split("_")[1])
@@ -41,8 +40,7 @@ def get_model(
         model = get_wide_resnet(
             depth=depth,
             width=width,
-            img_size=img_size,
-            in_channels=in_channels,
+            input_shape=input_shape,
             num_classes=num_classes,
             dropout=dropout,
         )
@@ -50,7 +48,7 @@ def get_model(
         backbone = keras.applications.ResNet50(
             weights=None,
             include_top=False,
-            input_shape=(img_size[0], img_size[1], in_channels),
+            input_shape=input_shape,
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -64,7 +62,7 @@ def get_model(
         backbone = keras.applications.ResNet50(
             weights="imagenet",
             include_top=False,
-            input_shape=(img_size[0], img_size[1], 3),
+            input_shape=input_shape,
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -78,7 +76,7 @@ def get_model(
         backbone = keras.applications.DenseNet121(
             weights=None,
             include_top=False,
-            input_shape=(img_size[0], img_size[1], in_channels),
+            input_shape=input_shape,
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -92,7 +90,7 @@ def get_model(
         backbone = keras.applications.DenseNet121(
             weights="imagenet",
             include_top=False,
-            input_shape=(img_size[0], img_size[1], 3),
+            input_shape=input_shape,
             classes=num_classes,
         )
         model = keras.Sequential(
@@ -104,14 +102,15 @@ def get_model(
         )
     elif model_name.split("_")[0] == "resnet1d" or model_name == "resnet1d":
         nb_feature_maps = int(model_name.split("_")[1]) if len(model_name.split("_")) > 1 else 64
-        model = build_1d_resnet(nb_classes=num_classes, input_shape=(1_000, in_channels), nb_feature_maps=nb_feature_maps)
+        model = build_1d_resnet(nb_classes=num_classes, input_shape=input_shape, batch_size=batch_size, nb_feature_maps=nb_feature_maps)
     elif model_name.split("_")[0] == "tabresnet":
         assert len(model_name.split("_")) == 3, f"Invalid model name {model_name}, expected format 'tabresnet_[width]_[n_blocks]'"
         parts = model_name.split("_")
         width_int = int(parts[1])
         n_blocks_int = int(parts[2])
         model = build_tabular_resnet(
-            input_shape=(in_channels,),
+            input_shape=input_shape,
+            batch_size=batch_size,
             width=width_int,
             depth=n_blocks_int,
             dropout_rate=dropout,
@@ -127,7 +126,7 @@ def get_model(
         patch_size = int(model_name.split("_")[2])
         if model_size == "b" and patch_size == 8:
             model = vit_b8(
-                image_size=img_size,
+                image_size=input_shape[2],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -136,7 +135,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 16:
             model = vit_b16(
-                image_size=img_size,
+                image_size=input_shape[2],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -145,7 +144,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 32:
             model = vit_b32(
-                image_size=img_size,
+                image_size=input_shape[2],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -154,7 +153,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 16:
             model = vit_l16(
-                image_size=img_size,
+                image_size=input_shape[2],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -163,7 +162,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 32:
             model = vit_l32(
-                image_size=img_size,
+                image_size=input_shape[2],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -172,7 +171,7 @@ def get_model(
             )
         else:
             raise ValueError(f"Invalid ViT variant {model_name}, model variant: {model_size}, patch size: {patch_size}")
-        if in_channels == 1:
+        if input_shape[-1] == 1:
             if preprocessing_func is None:
                 raise ValueError(
                     "Preprocessing function must be provided for grayscale images with ViT"
@@ -182,7 +181,7 @@ def get_model(
     if preprocessing_func is not None:
         final_model = keras.Sequential(
             [
-                keras.layers.Input(shape=(img_size[0], img_size[1], in_channels)),
+                keras.layers.Input(shape=input_shape),
                 keras.layers.Lambda(preprocessing_func, name="preprocessing"),
                 model,
             ]

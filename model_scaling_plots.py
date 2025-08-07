@@ -36,7 +36,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
+flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.935, "upper y-limit for test performance metric plot"
@@ -44,22 +44,29 @@ flags.DEFINE_float(
 flags.DEFINE_float("ylim_lower", 0.8, "lower y-limit for test performance metric plot")
 
 FITZ_LOG_DIRS = {
-    "WRN_28_2": "./logs/fitzpatrick/wrn_28_2",
-    "WRN_40_4": "./logs/fitzpatrick/wrn_40_4",
-    "VIT-B/16": "./logs/fitzpatrick/vit_b_16",
-    "VIT-L/16": "./logs/fitzpatrick/vit_l_16",
+    "WRN-28-2": "./logs/fitzpatrick/wrn_28_2",
+    "WRN-40-4": "./logs/fitzpatrick/wrn_40_4",
+    "VIT-B/16-64": "./logs/fitzpatrick/vit_b_16",
+    "VIT-B/16-128": "./logs/fitzpatrick/vit_b_16_128x128",
+    "VIT-L/16-64": "./logs/fitzpatrick/vit_l_16",
+    #"VIT-L/16-128": "./logs/fitzpatrick/vit_l_16",
 }
 COLORS = {
-    "WRN_28_2": "#bed3f7",
-    "WRN_40_4": "#6F9CEB",
-    "VIT-B/16": "#306bac",
-    "VIT-L/16": "#1C3762",
+    "CNN": "red",
+    "WRN-28-2": "#a981cf",
+    "WRN-40-4": "#4b296b",
+    "VIT-B/16-64": "#ddc8c4",
+    "VIT-B/16-128": "#896A67",
+    "VIT-L/16-64": "#6B4D57",
+    "VIT-L/16-128": "#523B43",
 }
 CHEX_LOGDIRS = {
-    "CNN": "./logs/chexpert/small_cnn",
-    "WRN_28_2": "./logs/chexpert/wrn_28_2",
-    "WRN_40_4": "./logs/chexpert/wrn_40_4",
-    "VIT-B/16": "./logs/chexpert/vit_b_16",
+    "WRN-28-2": "./logs/chexpert/wrn_28_2",
+    "WRN-40-4": "./logs/chexpert/wrn_40_4",
+    "VIT-B/16-64": "./logs/chexpert/vit_b_16_64x64",
+    "VIT-B/16-128": "./logs/chexpert/vit_b_16",
+    "VIT-L/16-64": "./logs/chexpert/vit_l_16_64x64",
+    #"VIT-L/16-128": "./logs/chexpert/vit_l_16",
 }
 
 
@@ -148,6 +155,7 @@ def main(argv):
             ax=axes[0],
             color=COLORS[model_name],
             label=f"{model_name}({np.mean(aucs):.2f})",
+            alpha=0.8,
         )
         conf.low.plot(
             ax=axes[0], color=COLORS[model_name], linestyle="--", lw=1, alpha=0.8
@@ -175,11 +183,7 @@ def main(argv):
     axes[0].set_ylim((ylim, 1))
     axes[0].spines[["right", "top"]].set_visible(False)
     axes[1].spines[["right", "top"]].set_visible(False)
-    xlabel = (
-        "MIA AUC (Patient-level)"
-        if FLAGS.dataset_name == "chexpert"
-        else "MIA AUC (Record-level)"
-    )
+    xlabel = "MIA AUC (Patient-level)"
     axes[0].set_xlabel(xlabel)
     axes[0].set_ylabel("1 - Cumulative Probability")
     axes[0].set_yscale("log")

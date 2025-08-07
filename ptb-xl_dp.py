@@ -9,6 +9,7 @@ os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]= "false"
 import keras # type: ignore
 import numpy as np
 from absl import app, flags # type: ignore
+from jax_privacy.keras import keras_api  # type: ignore
 
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
@@ -20,17 +21,16 @@ from src.train_utils.utils import (
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training steps.")
-flags.DEFINE_float("learning_rate", 0.25, "Learning rate.")
-flags.DEFINE_float("weight_decay", 5e-3, "L2 weight decay.")
-flags.DEFINE_float("momentum", 0.9, "Momentum parameter.")
-flags.DEFINE_integer("batch_size", 512, "Batch size.")
+flags.DEFINE_float("learning_rate", 5e-3, "Learning rate.")
+flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
+flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "resnet1d_128", "Name of the model to use.")
-flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
+flags.DEFINE_string("model", "resnet1d_32", "Name of the model to use.")
+flags.DEFINE_enum("lr_schedule", "constant", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup",
     0.05,
@@ -41,8 +41,8 @@ flags.DEFINE_float(
     1.0,
     "Relative fraction of total steps until learning rate is decayed to 1/10 times the original value. A value smaller than one means faster decay and likewise a bigger value leads to slower decay.",
 )
-flags.DEFINE_float("ema_decay", 0.995, "EMA decay.")
-flags.DEFINE_integer("grad_accum_steps", 2, "Number of gradient accumulation steps.")
+flags.DEFINE_float("ema_decay", 0.9, "EMA decay.")
+flags.DEFINE_integer("grad_accum_steps", 1, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_enum(
     "augment",
@@ -80,6 +80,11 @@ flags.DEFINE_string(
     "./logs/ptb-xl/",
     "Path to logdir.",
 )
+flags.DEFINE_bool("dp", True, "Whether to apply differential privacy.")
+flags.DEFINE_float("epsilon", np.inf, "Privacy budget parameter epsilon for DP training.")
+flags.DEFINE_float(
+    "clipping_norm", 1_000, "Clipping norm for DP training (gradient clipping)."
+)
 
 
 def main(argv):
@@ -101,10 +106,10 @@ def main(argv):
 
     # calculate number of steps (for cosine lr decay)
     if FLAGS.eval_only:
-        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        train_size = len(train_dataset)
     else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
+        train_size = int(len(train_dataset) * FLAGS.subset_ratio)
+    STEPS = train_size // FLAGS.batch_size * FLAGS.epochs
     def get_compiled_model():
         # create model, lr schedule and optimizer
         model = get_model(
@@ -114,20 +119,33 @@ def main(argv):
             dropout=FLAGS.dropout,
             preprocessing_func=None,
         )
+        if FLAGS.dp:
+            params = keras_api.DPKerasConfig(
+                epsilon=FLAGS.epsilon,
+                delta=1/train_size,
+                clipping_norm=FLAGS.clipping_norm,
+                batch_size=FLAGS.batch_size,
+                gradient_accumulation_steps=1,
+                train_steps=STEPS,
+                train_size=train_size,
+                seed=FLAGS.seed,
+                value_discretization_interval=1e-12,
+            )
+            print(params)
+            model = keras_api.make_private(model, params)
         schedule = MyCosineDecay(
             base_lr=FLAGS.learning_rate,
             steps=int(FLAGS.decay_steps * STEPS),
             relative_lr_warmup_steps=FLAGS.lr_warmup,
         )
-        opt = keras.optimizers.SGD(
+        opt = keras.optimizers.AdamW(
             learning_rate=(
                 schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
             ),
-            momentum=FLAGS.momentum,
             weight_decay=FLAGS.weight_decay,
             use_ema=FLAGS.ema,
             ema_momentum=FLAGS.ema_decay,
-            gradient_accumulation_steps=FLAGS.grad_accum_steps,
+            gradient_accumulation_steps=FLAGS.grad_accum_steps if FLAGS.grad_accum_steps> 1 else None,
         )
         # compile model
         model.compile(
@@ -150,7 +168,7 @@ def main(argv):
 
     if FLAGS.eval_only:
         model = get_compiled_model()
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,

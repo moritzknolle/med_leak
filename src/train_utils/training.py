@@ -126,6 +126,9 @@ def train_and_eval(
     wandb_project_name: str = "",
     log_wandb: bool = False,
     verbose: bool = True,
+    use_dp:bool=False,
+    noise_multiplier: Optional[float] = None,
+    clip_norm: Optional[float] = None,
 ) -> Tuple[keras.Model, dict, dict, dict, bool]:
     """
     Train and evaluate a model using the given datasets and training parameters.

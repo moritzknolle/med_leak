@@ -384,7 +384,7 @@ def composition_comparison_plot_overlapping_groups(
 def composition_comparison_plot(
     df: pd.DataFrame,
     group_col: str,
-    col_vals: List[Union[str]],
+    col_vals: List[str],
     xlabel: str,
     top_k_percent: int = 1,
     color_dict: Optional[Dict] = None,
@@ -990,6 +990,68 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             save_path=out_path / f"{dataset_name}_composition_plot_view.pdf",
             xlabel="Imaging View",
             col_vals=["MLO", "CC"],
+        )
+    elif dataset_name == "mimic-iv-ed":
+        # correct field 'race' to only include 'Black', 'White', 'Asian' and 'Other/Unknown'
+        black = 'Black'
+        white = 'White'
+        asian = 'Asian'
+        other = "Other/Unknown"
+
+        black_mask = (results_df.race.str.contains("BLACK", na=False))
+        white_mask = (results_df.race.str.contains("WHITE", na=False))
+        asian_mask = (results_df.race.str.contains("ASIAN", na=False))
+        other_mask = np.logical_not(black_mask | white_mask | asian_mask)
+
+        results_df.loc[black_mask, "race"] = black
+        results_df.loc[white_mask, "race"] = white
+        results_df.loc[asian_mask, "race"] = asian
+        results_df.loc[other_mask, "race"] = other
+        print(results_df['eci_Obesity'].value_counts(), results_df['insurance'].value_counts())
+        print(list(results_df.columns))
+        composition_comparison_plot(
+            df=results_df,
+            group_col="race",
+            color_dict=CXR_COLORS,
+            save_path=out_path / f"{dataset_name}_composition_plot_race.pdf",
+            xlabel="Race",
+            col_vals=["Black", "White", "Asian"],
+        )
+        # check if the race effect is confounded by insurance type
+        filtered_df = results_df[
+            results_df["eci_Obesity"]==0
+        ]  # only Medicare patients
+        composition_comparison_plot(
+            df=filtered_df,
+            group_col="race",
+            color_dict=CXR_COLORS,
+            save_path=out_path / f"{dataset_name}_composition_plot_race@NotObese.pdf",
+            xlabel="Race",
+            col_vals=["Black", "White", "Asian"],
+        )
+        composition_comparison_plot(
+            df=results_df,
+            group_col="cci_Cancer1",
+            color_dict={0: None, 1:None},
+            save_path=out_path / f"{dataset_name}_composition_plot_cancer.pdf",
+            xlabel="Cancer Status",
+            col_vals=["0", "1"],
+        )
+        composition_comparison_plot(
+            df=results_df,
+            group_col="insurance",
+            color_dict={"Medicare": None, "Medicaid":None},
+            save_path=out_path / f"{dataset_name}_composition_plot_insurance.pdf",
+            xlabel="Insurance Type",
+            col_vals=["Medicare", "Medicaid"],
+        )
+        composition_comparison_plot(
+            df=results_df,
+            group_col="eci_Obesity",
+            color_dict={0: None, 1:None},
+            save_path=out_path / f"{dataset_name}_composition_plot_obesity.pdf",
+            xlabel="Obesity Status",
+            col_vals=["0", "1"],
         )
     else:
         raise ValueError("Dataset not supported")

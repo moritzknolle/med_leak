@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
 
 import keras # type: ignore
 
@@ -91,11 +91,11 @@ class WRNBlock(keras.layers.Layer):
 
 
 def get_wrn_general(
-    in_channels: int,
+    input_shape: Tuple[int, ...],
     num_classes: int,
-    img_size: Tuple[int,int],
     blocks_per_group: List[int],
     width: int,
+    batch_size: Optional[int] = None,
     norm: Callable = NORM_DEFAULT,
     act: Callable = keras.activations.relu,
     dropout: float = 0.0,
@@ -113,7 +113,7 @@ def get_wrn_general(
         int(v * width) for v in [16 * (2**i) for i in range(len(blocks_per_group))]
     ]
     n = 16
-    inputs = keras.Input(shape=(img_size[0], img_size[1], in_channels))
+    inputs = keras.Input(shape=input_shape, batch_size=batch_size)
     x = inputs
     x = keras.layers.Conv2D(filters=n, kernel_size=3, **conv_args(3, n))(x)
     for i, (block, width) in enumerate(zip(blocks_per_group, widths)):
@@ -137,8 +137,8 @@ def get_wrn_general(
 
 
 def get_wide_resnet(
-    img_size: Tuple[int,int] = (32, 32),
-    in_channels: int = 3,
+    input_shape: Tuple[int, ...] = (64, 64, 1),
+    batch_size: Optional[int] = None,
     num_classes: int = 10,
     depth: int = 28,
     width: int = 2,
@@ -167,9 +167,9 @@ def get_wide_resnet(
         else keras.activations.relu
     )
     return get_wrn_general(
-        in_channels=in_channels,
+        input_shape=input_shape,
+        batch_size=batch_size,
         num_classes=num_classes,
-        img_size=img_size,
         blocks_per_group=blocks_per_group,
         width=width,
         norm=norm,

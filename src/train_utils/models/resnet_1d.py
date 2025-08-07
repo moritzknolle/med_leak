@@ -1,11 +1,14 @@
 # implemented as described in Wang et al., "Time Series Classification from Scratch with Deep Neural Networks: A Strong Baseline", Data Mining and Knowledge Discovery, 2019
 
 import keras  # type: ignore
-from typing import Tuple, Callable
+from typing import Tuple, Callable, Optional
 from functools import partial
 
 gn_10 = partial(
     keras.layers.GroupNormalization, axis=-1, groups=10, epsilon=1e-6, dtype="float32"
+)
+gn_16 = partial(
+    keras.layers.GroupNormalization, axis=-1, groups=16, epsilon=1e-6, dtype="float32"
 )
 bn_fn = partial(
     keras.layers.BatchNormalization, momentum=0.9, epsilon=1e-6, dtype="float32"
@@ -13,12 +16,13 @@ bn_fn = partial(
 
 
 def build_1d_resnet(
-    input_shape: Tuple[int, int],
-    nb_classes: int,
+    input_shape: Tuple[int, ...] = (1000, 12),
+    batch_size: Optional[int] = None,
+    nb_classes: int = 5,
     nb_feature_maps: int = 64,
-    norm: Callable = bn_fn,
+    norm: Callable = gn_16,
 ) -> keras.models.Model:
-    input = keras.layers.Input(input_shape)
+    input = keras.layers.Input(input_shape, batch_size=batch_size)
     # BLOCK 1
     x = keras.layers.Conv1D(filters=nb_feature_maps, kernel_size=8, padding="same")(
         input
@@ -114,14 +118,15 @@ class ResNetBlock(keras.Model):
 
 
 def build_tabular_resnet(
-    input_shape: Tuple[int],
+    input_shape: Tuple[int, ...] = (64,),
+    batch_size: Optional[int] = None,
     num_classes: int = 1,
     width: int = 300,
     depth: int = 5,
     dropout_rate: float = 0.1,
     norm: Callable = gn_10,
 ):
-    inputs = keras.Input(shape=input_shape)
+    inputs = keras.Input(shape=input_shape, batch_size=batch_size)
     x = keras.layers.Dense(width)(inputs)
     for _ in range(depth):
         x = ResNetBlock(width, dropout_rate)(x)

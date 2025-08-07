@@ -460,6 +460,8 @@ class PTBXLDataset(BaseDataset):
         )
         if load_base_file:
             self.ecg_inputs = np.load(img_path / f"X_100_{split}.npy")
+            print(f"... loaded base .npy file for PTB-XL dataset. shape={self.ecg_inputs.shape}, min= {self.ecg_inputs.min()}, max={self.ecg_inputs.max()}, mean={self.ecg_inputs.mean()}, std={self.ecg_inputs.std()}")
+
 
     def __getinput__(self, index: int):
         """Returns input corresponding to index i in the dataset"""
