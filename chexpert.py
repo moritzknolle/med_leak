@@ -1,11 +1,11 @@
-import os
+import os, gc
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
 
-import keras # type: ignore
+import keras, jax # type: ignore
 import numpy as np
 from absl import app, flags # type: ignore
 
@@ -111,8 +111,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=IMG_SIZE,
-            in_channels=1,
+            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1),
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
             preprocessing_func=preprocess_fn,
@@ -161,8 +160,8 @@ def main(argv):
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
         return callbacks
 
-    model = get_compiled_model()
     if FLAGS.eval_only:
+        model = get_compiled_model()
         _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
@@ -181,6 +180,7 @@ def main(argv):
     else:
         while True:
             try:
+                model = get_compiled_model()
                 train_random_subset(
                     compiled_model=model,
                     train_dataset=train_dataset,
@@ -201,7 +201,10 @@ def main(argv):
                     log_wandb=FLAGS.log_wandb,
                     wandb_project_name="chexpert",
                 )
-                model = get_compiled_model()
+                del model
+                keras.backend.clear_session()
+                jax.clear_caches()
+                gc.collect()
             except StopIteration:
                 break
 

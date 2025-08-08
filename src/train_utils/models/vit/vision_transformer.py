@@ -91,7 +91,7 @@ def build_model(
     image_size_tuple = interpret_image_size(image_size)
     assert (image_size_tuple[0] % patch_size == 0) and (
         image_size_tuple[1] % patch_size == 0
-    ), "image_size must be a multiple of patch_size"
+    ), f"image_size must be a multiple of patch_size {image_size_tuple} % {patch_size} != 0"
     x = keras.layers.Input(shape=(image_size_tuple[0], image_size_tuple[1], 3))
     y = keras.layers.Conv2D(
         filters=hidden_size,

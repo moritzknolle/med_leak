@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
 
-import keras
+import keras, jax # type: ignore
 import numpy as np
 from absl import app, flags
 
@@ -106,8 +106,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=IMG_SiZE,
-            in_channels=3,
+            input_shape=(IMG_SiZE[0], IMG_SiZE[1], 3),
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
         )
@@ -186,6 +185,7 @@ def main(argv):
                 )
                 del model
                 keras.backend.clear_session()
+                jax.clear_caches()
                 gc.collect()
             except StopIteration:
                 break

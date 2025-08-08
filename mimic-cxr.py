@@ -119,8 +119,7 @@ def main(argv):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            img_size=IMG_SIZE,
-            in_channels=1,
+            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1) if not imagenet_weights else (IMG_SIZE[0], IMG_SIZE[1], 3),
             num_classes=NUM_CLASSES,
             dropout=FLAGS.dropout,
             preprocessing_func=preprocess_fn,

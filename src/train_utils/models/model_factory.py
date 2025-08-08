@@ -126,7 +126,7 @@ def get_model(
         patch_size = int(model_name.split("_")[2])
         if model_size == "b" and patch_size == 8:
             model = vit_b8(
-                image_size=input_shape[2],
+                image_size=input_shape[1],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -135,7 +135,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 16:
             model = vit_b16(
-                image_size=input_shape[2],
+                image_size=input_shape[1],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -144,7 +144,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 32:
             model = vit_b32(
-                image_size=input_shape[2],
+                image_size=input_shape[1],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -153,7 +153,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 16:
             model = vit_l16(
-                image_size=input_shape[2],
+                image_size=input_shape[1],
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -162,7 +162,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 32:
             model = vit_l32(
-                image_size=input_shape[2],
+                image_size=input_shape[1],
                 activation="linear",
                 pretrained=True,
                 include_top=True,

@@ -21,6 +21,8 @@ srun python fitzpatrick.py \
     --n_runs=200 \
     --model='vit_l_16' \
     --img_size=128,128 \
+    --batch_size=128 \
+    --grad_accum_steps=2 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
     --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_l_16_128x128" \
