@@ -12,7 +12,7 @@ import tensorflow as tf # type: ignore
 from absl import flags # type: ignore
 import pandas as pd # type: ignore
 
-import wandb
+import wandb # type: ignore
 
 from .logger import RetrainLogger
 from .utils import WandbLogger
@@ -161,10 +161,24 @@ def train_and_eval(
     if log_wandb:
         if wandb_project_name == "":
             raise ValueError("Must provide a valid wandb project name")
-        wandb.init(project=f"{wandb_project_name}") 
-        wandb.config.update(flags.FLAGS)
-        wandb.config.update({"run_seed": seed})
-        wandb.config.update({"epochs": epochs})
+        wandb.init(project=f"{wandb_project_name}") # type: ignore
+        wandb.config.update(flags.FLAGS) # type: ignore
+        wandb.config.update({"run_seed": seed}) # type: ignore
+        wandb.config.update({"epochs": epochs}) # type: ignore
+        if hasattr(compiled_model, "_dp_params"):
+                if compiled_model._dp_params.noise_multiplier is None:
+                    noise_mult = compiled_model._dp_params.update_with_calibrated_noise_multiplier().noise_multiplier
+                else:
+                    noise_mult = compiled_model._dp_params.noise_multiplier
+                dp_params = {
+                    "epsilon": compiled_model._dp_params.epsilon,
+                    "clipping_norm": compiled_model._dp_params.clipping_norm,
+                    "delta": compiled_model._dp_params.delta,
+                    "train_size": compiled_model._dp_params.train_size,
+                    "noise_multiplier": noise_mult,
+                    "train_steps": compiled_model._dp_params.train_steps,
+                }
+                wandb.config.update(dp_params) # type: ignore
     if subset_indices is None:
         n_train = train_dataset.__len__()
     else:
