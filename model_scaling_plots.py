@@ -55,10 +55,10 @@ COLORS = {
     "CNN": "red",
     "WRN-28-2": "#a981cf",
     "WRN-40-4": "#4b296b",
-    "VIT-B/16-64": "#ddc8c4",
+    "VIT-B/16-64": "#ceb0aa",
     "VIT-B/16-128": "#896A67",
-    "VIT-L/16-64": "#6B4D57",
-    "VIT-L/16-128": "#523B43",
+    "VIT-L/16-64": "#4f3940",
+    "VIT-L/16-128": 'red', #"#523B43",
 }
 CHEX_LOGDIRS = {
     "WRN-28-2": "./logs/chexpert/wrn_28_2",

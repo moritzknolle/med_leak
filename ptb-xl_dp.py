@@ -20,10 +20,10 @@ from src.train_utils.utils import (
 )
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 300, "Number of training steps.")
+flags.DEFINE_integer("epochs", 200, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 5e-3, "Learning rate.")
 flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 2048, "Batch size.")
+flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
@@ -85,7 +85,7 @@ flags.DEFINE_float(
     "epsilon", np.inf, "Privacy budget parameter epsilon for DP training."
 )
 flags.DEFINE_float(
-    "clipping_norm", 1_000, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 50_000, "Clipping norm for DP training (gradient clipping)."
 )
 
 
@@ -165,8 +165,8 @@ def main(argv):
         )
         return model
 
-    def get_callbacks(is_ema: bool, reduce_lr_plateau: bool = False):
-        callbacks = [keras.callbacks.keras.callbacks.ReduceLROnPlateau(monitor='val_macro_auroc', factor=0.5, cooldown=20)] if reduce_lr_plateau else []
+    def get_callbacks(is_ema: bool, reduce_lr_plateau: bool = True):
+        callbacks = [keras.callbacks.ReduceLROnPlateau(monitor='val_macro_auroc', factor=0.5, patience=10, cooldown=20, verbose=True)] if reduce_lr_plateau else []
         if is_ema:
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
         return callbacks

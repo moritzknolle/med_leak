@@ -19,7 +19,6 @@ echo 'Opened virtual environment'
 srun python ptb-xl_dp.py \
     --eval_only=False \
     --n_runs=200 \
-    --model='resnet1d_64' \
     --epsilon=10 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \

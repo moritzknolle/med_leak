@@ -87,7 +87,7 @@ def main(argv):
         dataset_name="chexpert",
         img_size=IMG_SIZE,
         csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data/chexpert/CheXpert-v1.0"),
+        data_root=Path("/home/moritz/data/chexpert/"),
         save_root=Path(FLAGS.save_root),
         get_numpy=True,
         load_from_disk=True,
