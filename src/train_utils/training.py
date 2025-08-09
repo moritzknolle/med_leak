@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf # type: ignore
 from absl import flags # type: ignore
 import pandas as pd # type: ignore
+from jax_privacy.keras import keras_api  # type: ignore
 
 import wandb # type: ignore
 
@@ -127,8 +128,8 @@ def train_and_eval(
     log_wandb: bool = False,
     verbose: bool = True,
     use_dp:bool=False,
-    noise_multiplier: Optional[float] = None,
-    clip_norm: Optional[float] = None,
+    clipping_norm: Optional[float] = None,
+    epsilon: Optional[float] = None,
 ) -> Tuple[keras.Model, dict, dict, dict, bool]:
     """
     Train and evaluate a model using the given datasets and training parameters.
@@ -148,6 +149,9 @@ def train_and_eval(
         wandb_project_name: str, wandb project name
         log_wandb: bool, whether to log to wandb
         verbose: bool, whether to print verbose logs
+        use_dp: bool, whether to train with differential privacy
+        clipping_norm: Optional[float], clipping norm for differential privacy
+        epsilon: Optional[float], privacy budget for differential privacy
 
     Returns:
         Tuple[keras.Model, dict, dict], trained model, training history, test metrics
@@ -241,6 +245,21 @@ def train_and_eval(
         print("... delibaretely overfitting on first batch. Careful!")
         train_ds = first_batch_only(train_ds)
     print(f"... training on {n_train} samples, evaluating on {n_test} samples")
+    if use_dp:
+        train_steps = n_train // batch_size * epochs
+        params = keras_api.DPKerasConfig(
+                epsilon=epsilon,
+                delta=1 / len(train_dataset),
+                clipping_norm=clipping_norm,
+                batch_size=batch_size,
+                gradient_accumulation_steps=1,
+                train_steps=train_steps,
+                train_size=n_train,
+                seed=seed,
+                value_discretization_interval=1e-12,
+            )
+        compiled_model = keras_api.make_private(compiled_model, params)
+        print("DP params:", params)
 
     start_time = time.time()
 
@@ -368,6 +387,9 @@ def train_random_subset(
     wandb_project_name: str = "",
     log_wandb: bool = False,
     verbose: bool = True,
+    use_dp:bool=False,
+    clipping_norm: Optional[float] = None,
+    epsilon: Optional[float] = None,
 ):
     """
     Train a model on a random subset of train_dataset. Logs to wandb and saves logits and corresponding labels of train and test dataset to logdir.
@@ -394,6 +416,9 @@ def train_random_subset(
         wandb_project_name: str, wandb project name
         log_wandb: bool, whether to log to wandb
         verbose: bool, whether to print verbose logs
+        use_dp: bool, whether to train with differential privacy
+        clipping_norm: Optional[float], clipping norm for differential privacy
+        epsilon: Optional[float], privacy budget for differential privacy
 
     Returns:
         None
@@ -511,6 +536,9 @@ def train_random_subset(
             wandb_project_name=wandb_project_name,
             log_wandb=log_wandb,
             verbose=verbose,
+            use_dp=use_dp,
+            clipping_norm=clipping_norm,
+            epsilon=epsilon,
         )
     except Exception as e:
         print(f"Error: {e}")

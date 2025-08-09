@@ -83,50 +83,20 @@ flags.DEFINE_string(
     "Path to logdir.",
 )
 
-
-def main(argv):
-    np.random.seed(FLAGS.seed)
-    if FLAGS.mixed_precision:
-        keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 14
-    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    train_dataset, test_dataset = get_dataset(
-        dataset_name="mimic",
-        img_size=IMG_SIZE,
-        csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg"),
-        save_root=Path(FLAGS.save_root),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=True,
-    )
-    if "_" in FLAGS.model:
-        imagenet_weights = (
-            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-        )
-    else:
-        imagenet_weights = False
-
-    # calculate number of steps (for cosine lr decay)
-    if FLAGS.eval_only:
-        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-    else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
-    def get_compiled_model():
+def get_compiled_model(train_steps:int, imagenet_weights:bool=False, num_classes: int = 14):
         preprocess_fn = grayscale_to_rgb if imagenet_weights else None
         print("... preprocess_fn", preprocess_fn)
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1) if not imagenet_weights else (IMG_SIZE[0], IMG_SIZE[1], 3),
-            num_classes=NUM_CLASSES,
+            input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 1) if not imagenet_weights else (FLAGS.img_size[0], FLAGS.img_size[1], 3),
+            num_classes=num_classes,
             dropout=FLAGS.dropout,
             preprocessing_func=preprocess_fn,
         )
         schedule = MyCosineDecay(
             base_lr=FLAGS.learning_rate,
-            steps=int(FLAGS.decay_steps * STEPS),
+            steps=int(FLAGS.decay_steps * train_steps),
             relative_lr_warmup_steps=FLAGS.lr_warmup,
         )
         opt = keras.optimizers.SGD(
@@ -140,7 +110,7 @@ def main(argv):
             gradient_accumulation_steps=FLAGS.grad_accum_steps,
         )
         # compile model
-        cxp_label_weights = np.zeros(NUM_CLASSES)
+        cxp_label_weights = np.zeros(num_classes)
         cxp_label_weights[CXP_CHALLENGE_LABELS_IDX] = 1
         model.compile(
             optimizer=opt,
@@ -160,14 +130,38 @@ def main(argv):
         )
         return model
 
-    def get_callbacks(is_ema: bool):
+def get_callbacks(is_ema: bool):
         callbacks = []
         if is_ema:
             callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
         return callbacks
 
+
+
+def main(argv):
+    if FLAGS.mixed_precision:
+        keras.mixed_precision.set_global_policy("mixed_float16")
+    if "_" in FLAGS.model:
+        imagenet_weights = (
+            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+        )
+    else:
+        imagenet_weights = False
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
+    
     if FLAGS.eval_only:
-        model = get_compiled_model()
+        train_dataset, test_dataset = get_dataset(
+        dataset_name="mimic",
+        img_size=IMG_SIZE,
+        csv_root=Path("./data/csv"),
+        data_root=Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg"),
+        save_root=Path(FLAGS.save_root),
+        get_numpy=True,
+        load_from_disk=True,
+        overwrite_existing=True,
+    )
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
         model, _, _, _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
@@ -186,7 +180,18 @@ def main(argv):
     else:
         while True:
             try:
-                model = get_compiled_model()
+                train_dataset, test_dataset = get_dataset(
+                dataset_name="mimic",
+                img_size=IMG_SIZE,
+                csv_root=Path("./data/csv"),
+                data_root=Path("/home/moritz/data/mimic-cxr/mimic-cxr-jpg"),
+                save_root=Path(FLAGS.save_root),
+                get_numpy=True,
+                load_from_disk=True,
+                overwrite_existing=True,
+            )
+                STEPS = int(len(train_dataset)*FLAGS.subset_ratio) // FLAGS.batch_size * FLAGS.epochs
+                model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
                 train_random_subset(
                     compiled_model=model,
                     train_dataset=train_dataset,

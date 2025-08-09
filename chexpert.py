@@ -76,14 +76,76 @@ flags.DEFINE_string(
     "Path to logdir.",
 )
 
+def get_compiled_model(train_steps:int, imagenet_weights:bool, num_classes: int = 14):
+    preprocess_fn = grayscale_to_rgb if imagenet_weights else None
+    print("... preprocess_fn", preprocess_fn)
+    # create model, lr schedule and optimizer
+    model = get_model(
+        model_name=FLAGS.model,
+        input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 1),
+        num_classes=num_classes,
+        dropout=FLAGS.dropout,
+        preprocessing_func=preprocess_fn,
+    )
+    schedule = MyCosineDecay(
+        base_lr=FLAGS.learning_rate,
+        steps=int(FLAGS.decay_steps * train_steps),
+        relative_lr_warmup_steps=FLAGS.lr_warmup,
+    )
+    opt = keras.optimizers.SGD(
+        learning_rate=(
+            schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
+        ),
+        momentum=0.9,
+        weight_decay=FLAGS.weight_decay,
+        use_ema=FLAGS.ema,
+        ema_momentum=FLAGS.ema_decay,
+        gradient_accumulation_steps=(
+            FLAGS.grad_accum_steps if FLAGS.grad_accum_steps > 1 else None
+        ),
+    )
+    # compile model
+    cxp_label_weights = np.zeros(num_classes)
+    cxp_label_weights[CXP_CHALLENGE_LABELS_IDX] = 1
+    model.compile(
+        optimizer=opt,
+        loss=keras.losses.BinaryCrossentropy(from_logits=True),
+        metrics=[
+            keras.metrics.CategoricalAccuracy(),
+            keras.metrics.AUC(
+                multi_label=True,
+                from_logits=True,
+                label_weights=cxp_label_weights,
+                name="macro_auroc(cxp)",
+            ),  # CheXpert protocol: macro AUROC over the 5 challenge labels
+            keras.metrics.AUC(
+                multi_label=True, from_logits=True, name="macro_auroc"
+            ),  # macro AUROC over all classes
+        ],
+    )
+    return model
+
+
+def get_callbacks(is_ema: bool):
+    callbacks = []
+    if is_ema:
+        callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
+    return callbacks
 
 def main(argv):
-    np.random.seed(FLAGS.seed)
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 14
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    train_dataset, test_dataset = get_dataset(
+    
+    if len(FLAGS.model.split("_"))>1:
+        imagenet_weights = (
+            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+        )
+    else:
+        imagenet_weights = False
+
+    if FLAGS.eval_only:
+        train_dataset, test_dataset = get_dataset(
         dataset_name="chexpert",
         img_size=IMG_SIZE,
         csv_root=Path("./data/csv"),
@@ -93,75 +155,8 @@ def main(argv):
         load_from_disk=True,
         overwrite_existing=False,
     )
-    if len(FLAGS.model.split("_"))>1:
-        imagenet_weights = (
-            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-        )
-    else:
-        imagenet_weights = False
-    # calculate number of steps (for cosine lr decay)
-    if FLAGS.eval_only:
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-    else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
-    def get_compiled_model():
-        preprocess_fn = grayscale_to_rgb if imagenet_weights else None
-        print("... preprocess_fn", preprocess_fn)
-        # create model, lr schedule and optimizer
-        model = get_model(
-            model_name=FLAGS.model,
-            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1),
-            num_classes=NUM_CLASSES,
-            dropout=FLAGS.dropout,
-            preprocessing_func=preprocess_fn,
-        )
-        schedule = MyCosineDecay(
-            base_lr=FLAGS.learning_rate,
-            steps=int(FLAGS.decay_steps * STEPS),
-            relative_lr_warmup_steps=FLAGS.lr_warmup,
-        )
-        opt = keras.optimizers.SGD(
-            learning_rate=(
-                schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
-            ),
-            momentum=0.9,
-            weight_decay=FLAGS.weight_decay,
-            use_ema=FLAGS.ema,
-            ema_momentum=FLAGS.ema_decay,
-            gradient_accumulation_steps=(
-                FLAGS.grad_accum_steps if FLAGS.grad_accum_steps > 1 else None
-            ),
-        )
-        # compile model
-        cxp_label_weights = np.zeros(NUM_CLASSES)
-        cxp_label_weights[CXP_CHALLENGE_LABELS_IDX] = 1
-        model.compile(
-            optimizer=opt,
-            loss=keras.losses.BinaryCrossentropy(from_logits=True),
-            metrics=[
-                keras.metrics.CategoricalAccuracy(),
-                keras.metrics.AUC(
-                    multi_label=True,
-                    from_logits=True,
-                    label_weights=cxp_label_weights,
-                    name="macro_auroc(cxp)",
-                ),  # CheXpert protocol: macro AUROC over the 5 challenge labels
-                keras.metrics.AUC(
-                    multi_label=True, from_logits=True, name="macro_auroc"
-                ),  # macro AUROC over all classes
-            ],
-        )
-        return model
-
-    def get_callbacks(is_ema: bool):
-        callbacks = []
-        if is_ema:
-            callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
-        return callbacks
-
-    if FLAGS.eval_only:
-        model = get_compiled_model()
+        model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
         _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
@@ -180,7 +175,18 @@ def main(argv):
     else:
         while True:
             try:
-                model = get_compiled_model()
+                train_dataset, test_dataset = get_dataset(
+                    dataset_name="chexpert",
+                    img_size=IMG_SIZE,
+                    csv_root=Path("./data/csv"),
+                    data_root=Path("/home/moritz/data/chexpert/"),
+                    save_root=Path(FLAGS.save_root),
+                    get_numpy=True,
+                    load_from_disk=True,
+                    overwrite_existing=False,
+                )
+                STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+                model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
                 train_random_subset(
                     compiled_model=model,
                     train_dataset=train_dataset,

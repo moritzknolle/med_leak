@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
 
-import keras, jax # type: ignore
+import keras, jax  # type: ignore
 import numpy as np
 from absl import app, flags
 
@@ -77,97 +77,100 @@ flags.DEFINE_string(
 )
 
 
+def get_compiled_model(train_steps: int, num_classes: int = 3):
+    # create model, lr schedule and optimizer
+    model = get_model(
+        model_name=FLAGS.model,
+        input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 3),
+        num_classes=num_classes,
+        dropout=FLAGS.dropout,
+    )
+    schedule = MyCosineDecay(
+        base_lr=FLAGS.learning_rate,
+        steps=int(FLAGS.decay_steps * train_steps),
+        relative_lr_warmup_steps=FLAGS.lr_warmup,
+    )
+    opt = keras.optimizers.SGD(
+        learning_rate=(
+            schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
+        ),
+        momentum=0.9,
+        weight_decay=FLAGS.weight_decay,
+        use_ema=FLAGS.ema,
+        ema_momentum=FLAGS.ema_decay,
+        gradient_accumulation_steps=FLAGS.grad_accum_steps,
+    )
+    # compile model
+    model.compile(
+        optimizer=opt,
+        loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+        metrics=[
+            keras.metrics.CategoricalAccuracy(),
+            keras.metrics.AUC(from_logits=True, name="auroc"),
+        ],
+    )
+    return model
+
+
+def get_callbacks(is_ema: bool):
+    callbacks = []
+    if is_ema:
+        callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
+    return callbacks
+
 def main(argv):
-    np.random.seed(FLAGS.seed)
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 3
-    IMG_SiZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    np.random.seed(FLAGS.seed)
-
-    train_dataset, test_dataset = get_dataset(
-        dataset_name="fitzpatrick",
-        img_size=IMG_SiZE,
-        csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data/fitzpatrick17k"),
-        save_root=Path(FLAGS.save_root),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=False,
-    )
-
-    # calculate number of steps (for cosine lr decay)
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
+    
     if FLAGS.eval_only:
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="fitzpatrick",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data/fitzpatrick17k"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=False,
+        )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-    else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
-    def get_compiled_model():
-        # create model, lr schedule and optimizer
-        model = get_model(
-            model_name=FLAGS.model,
-            input_shape=(IMG_SiZE[0], IMG_SiZE[1], 3),
-            num_classes=NUM_CLASSES,
-            dropout=FLAGS.dropout,
+        model = get_compiled_model(train_steps=STEPS)
+        _, _, _, _ = train_and_eval(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            seed=FLAGS.seed,
+            target_metric="val_auroc",
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="fitzpatrick",
         )
-        schedule = MyCosineDecay(
-            base_lr=FLAGS.learning_rate,
-            steps=int(FLAGS.decay_steps * STEPS),
-            relative_lr_warmup_steps=FLAGS.lr_warmup,
-        )
-        opt = keras.optimizers.SGD(
-            learning_rate=(
-                schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
-            ),
-            momentum=0.9,
-            weight_decay=FLAGS.weight_decay,
-            use_ema=FLAGS.ema,
-            ema_momentum=FLAGS.ema_decay,
-            gradient_accumulation_steps=FLAGS.grad_accum_steps,
-        )
-        # compile model
-        model.compile(
-            optimizer=opt,
-            loss=keras.losses.CategoricalCrossentropy(from_logits=True),
-            metrics=[
-                keras.metrics.CategoricalAccuracy(),
-                keras.metrics.AUC(from_logits=True, name="auroc"),
-            ],
-        )
-        return model
-
-    def get_callbacks(is_ema: bool):
-        callbacks = []
-        if is_ema:
-            callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
-        return callbacks
-
-    if FLAGS.eval_only:
-            model = get_compiled_model()
-            _, _, _, _ = train_and_eval(
-                compiled_model=model,
-                train_dataset=train_dataset,
-                test_dataset=test_dataset,
-                batch_size=FLAGS.batch_size,
-                aug_fn=get_aug_fn(FLAGS.augment),
-                augment=True if FLAGS.augment != "None" else False,
-                epochs=FLAGS.epochs,
-                callbacks=get_callbacks(FLAGS.ema),
-                ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                seed=FLAGS.seed,
-                target_metric="val_auroc",
-                log_wandb=FLAGS.log_wandb,
-                wandb_project_name="fitzpatrick",
-            )
     else:
         while True:
             try:
-                model = get_compiled_model()
+                train_dataset, test_dataset = get_dataset(
+                    dataset_name="fitzpatrick",
+                    img_size=IMG_SIZE,
+                    csv_root=Path("./data/csv"),
+                    data_root=Path("/home/moritz/data/fitzpatrick17k"),
+                    save_root=Path(FLAGS.save_root),
+                    get_numpy=True,
+                    load_from_disk=True,
+                    overwrite_existing=False,
+                )
+                STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+                model = get_compiled_model(train_steps=STEPS)
                 train_random_subset(
                     compiled_model=model,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
-                    patient_id_col='md5hash',
+                    patient_id_col="md5hash",
                     batch_size=FLAGS.batch_size,
                     aug_fn=get_aug_fn(FLAGS.augment),
                     augment=True if FLAGS.augment != "None" else False,

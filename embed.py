@@ -4,15 +4,14 @@ from pathlib import Path
 # set keras backend to jax and enable compilation caching
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
-import keras # type: ignore
+import keras  # type: ignore
 import numpy as np
-from absl import app, flags # type: ignore
+from absl import app, flags  # type: ignore
 
 from src.data_utils.dataset_factory import get_dataset
 from src.train_utils.models.model_factory import get_model
 from src.train_utils.training import train_and_eval, train_random_subset
-from src.train_utils.utils import (MyCosineDecay, get_aug_fn,
-                                   grayscale_to_rgb)
+from src.train_utils.utils import MyCosineDecay, get_aug_fn, grayscale_to_rgb
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 30, "Number of training steps.")
@@ -76,74 +75,66 @@ flags.DEFINE_string(
 )
 
 
+def get_compiled_model(train_steps: int, num_classes: int = 4):
+    # create model, lr schedule and optimizer
+    model = get_model(
+        model_name=FLAGS.model,
+        input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 1),
+        num_classes=num_classes,
+        dropout=FLAGS.dropout,
+    )
+    schedule = MyCosineDecay(
+        base_lr=FLAGS.learning_rate,
+        steps=int(FLAGS.decay_steps * train_steps),
+        relative_lr_warmup_steps=FLAGS.lr_warmup,
+    )
+    opt = keras.optimizers.SGD(
+        learning_rate=(
+            schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
+        ),
+        momentum=FLAGS.momentum,
+        weight_decay=FLAGS.weight_decay,
+        use_ema=FLAGS.ema,
+        ema_momentum=FLAGS.ema_decay,
+        gradient_accumulation_steps=FLAGS.grad_accum_steps,
+    )
+    # compile model
+    model.compile(
+        optimizer=opt,
+        loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+        metrics=[
+            keras.metrics.CategoricalAccuracy(),
+            keras.metrics.AUC(from_logits=True),
+        ],
+    )
+    return model
+
+
+def get_callbacks(is_ema: bool):
+    callbacks = []
+    if is_ema:
+        callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
+    return callbacks
+
+
 def main(argv):
-    np.random.seed(FLAGS.seed)
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
     NUM_CLASSES = 4
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    train_dataset, test_dataset = get_dataset(
-        dataset_name="embed",
-        img_size=IMG_SIZE,
-        csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data_massive/embed_small/png/1024x768"),
-        save_root=Path(FLAGS.save_root),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=True,
-    )
-    imagenet_weights = (
-        FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
-    )
-    # calculate number of steps (for cosine lr decay)
+
     if FLAGS.eval_only:
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="embed",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data_massive/embed_small/png/1024x768"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=True,
+        )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-    else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
-    def get_compiled_model():
-        preprocess_fn = grayscale_to_rgb if imagenet_weights else None
-        print("... preprocess_fn", preprocess_fn)
-        # create model, lr schedule and optimizer
-        model = get_model(
-            model_name=FLAGS.model,
-            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1),
-            num_classes=NUM_CLASSES,
-            dropout=FLAGS.dropout,
-        )
-        schedule = MyCosineDecay(
-            base_lr=FLAGS.learning_rate,
-            steps=int(FLAGS.decay_steps * STEPS),
-            relative_lr_warmup_steps=FLAGS.lr_warmup,
-        )
-        opt = keras.optimizers.SGD(
-            learning_rate=(
-                schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
-            ),
-            momentum=FLAGS.momentum,
-            weight_decay=FLAGS.weight_decay,
-            use_ema=FLAGS.ema,
-            ema_momentum=FLAGS.ema_decay,
-            gradient_accumulation_steps=FLAGS.grad_accum_steps,
-        )
-        # compile model
-        model.compile(
-            optimizer=opt,
-            loss=keras.losses.CategoricalCrossentropy(from_logits=True),
-            metrics=[
-                keras.metrics.CategoricalAccuracy(),
-                keras.metrics.AUC(from_logits=True),
-            ],
-        )
-        return model
-
-    def get_callbacks(is_ema: bool):
-        callbacks = []
-        if is_ema:
-            callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
-        return callbacks
-
-    if FLAGS.eval_only:
         model = get_compiled_model()
         _ = train_and_eval(
             compiled_model=model,
@@ -163,6 +154,24 @@ def main(argv):
     else:
         while True:
             try:
+                train_dataset, test_dataset = get_dataset(
+                    dataset_name="embed",
+                    img_size=IMG_SIZE,
+                    csv_root=Path("./data/csv"),
+                    data_root=Path(
+                        "/home/moritz/data_massive/embed_small/png/1024x768"
+                    ),
+                    save_root=Path(FLAGS.save_root),
+                    get_numpy=True,
+                    load_from_disk=True,
+                    overwrite_existing=True,
+                )
+                STEPS = (
+                    len(train_dataset)
+                    * FLAGS.subset_ratio
+                    // FLAGS.batch_size
+                    * FLAGS.epochs
+                )
                 model = get_compiled_model()
                 train_random_subset(
                     compiled_model=model,

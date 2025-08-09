@@ -70,41 +70,17 @@ flags.DEFINE_string(
     "Path to logdir.",
 )
 
-
-def main(argv):
-    np.random.seed(FLAGS.seed)
-    if FLAGS.mixed_precision:
-        keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 7
-    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    train_dataset, test_dataset = get_dataset(
-        dataset_name="fairvision",
-        img_size=IMG_SIZE,
-        csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
-        save_root=Path(FLAGS.save_root),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=False,
-    )
-
-    # calculate number of steps (for cosine lr decay)
-    if FLAGS.eval_only:
-        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-    else:
-        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-
-    def get_compiled_model():
+def get_compiled_model(train_steps:int, num_classes:int = 7):
         # create model, lr schedule and optimizer
         model = get_model(
             model_name=FLAGS.model,
-            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 1),
-            num_classes=NUM_CLASSES,
+            input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 1),
+            num_classes=num_classes,
             dropout=FLAGS.dropout,
         )
         schedule = MyCosineDecay(
             base_lr=FLAGS.learning_rate,
-            steps=STEPS,
+            steps=train_steps,
             relative_lr_warmup_steps=FLAGS.lr_warmup,
         )
         opt = keras.optimizers.SGD(
@@ -128,15 +104,31 @@ def main(argv):
         )
         return model
 
-    def get_callbacks(is_ema: bool):
-        callbacks = []
-        if is_ema:
-            callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
-        return callbacks
+def get_callbacks(is_ema: bool):
+    callbacks = []
+    if is_ema:
+        callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
+    return callbacks
 
-    compiled_model = get_compiled_model()
+def main(argv):
+    if FLAGS.mixed_precision:
+        keras.mixed_precision.set_global_policy("mixed_float16")
+    IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
+
     if FLAGS.eval_only:
-        _, _, _, _ = train_and_eval(
+        train_dataset, test_dataset = get_dataset(
+        dataset_name="fairvision",
+        img_size=IMG_SIZE,
+        csv_root=Path("./data/csv"),
+        data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
+        save_root=Path(FLAGS.save_root),
+        get_numpy=True,
+        load_from_disk=True,
+        overwrite_existing=False,
+    )
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        compiled_model = get_compiled_model(train_steps=STEPS)
+        _ = train_and_eval(
             compiled_model=compiled_model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,
@@ -154,6 +146,17 @@ def main(argv):
     else:
         while True:
             try:
+                train_dataset, test_dataset = get_dataset(
+                    dataset_name="fairvision",
+                    img_size=IMG_SIZE,
+                    csv_root=Path("./data/csv"),
+                    data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
+                    save_root=Path(FLAGS.save_root),
+                    get_numpy=True,
+                    load_from_disk=True,
+                    overwrite_existing=False,
+                )
+                STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
                 compiled_model = get_compiled_model()
                 train_random_subset(
                     compiled_model=compiled_model,
