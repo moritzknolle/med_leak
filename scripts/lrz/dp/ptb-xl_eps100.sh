@@ -13,7 +13,7 @@
 
 source /dss/dsshome1/03/ga92hev2/miniconda3/etc/profile.d/conda.sh
 conda deactivate
-conda activate keras
+conda activate keras_dp
 echo 'Opened virtual environment'
 
 srun python ptb-xl_dp.py \
