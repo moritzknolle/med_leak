@@ -81,9 +81,10 @@ def get_compiled_model(train_steps: int, imagenet_weights: bool, num_classes: in
     preprocess_fn = grayscale_to_rgb if imagenet_weights else None
     print("... preprocess_fn", preprocess_fn)
     # create model, lr schedule and optimizer
+    input_shape=(int(FLAGS.img_size[0]), int(FLAGS.img_size[1]), 1) if not imagenet_weights else (int(FLAGS.img_size[0]), int(FLAGS.img_size[1]), 3)
     model = get_model(
         model_name=FLAGS.model,
-        input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 1),
+        input_shape=input_shape,
         num_classes=num_classes,
         dropout=FLAGS.dropout,
         preprocessing_func=preprocess_fn,

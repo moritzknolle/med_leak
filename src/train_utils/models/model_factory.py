@@ -28,6 +28,8 @@ def get_model(
     Returns:
         Callable: function that returns the corresponding model
     """
+    if not isinstance(input_shape[0], int) or not isinstance(input_shape[1], int) or not isinstance(input_shape[2], int):
+        raise ValueError("expected input_shape to be a tuple of integers, got: {}".format(input_shape))
     if model_name == "small_cnn":
         if dropout != 0.0:
             raise ValueError("Small CNN does not support dropout")
@@ -126,7 +128,7 @@ def get_model(
         patch_size = int(model_name.split("_")[2])
         if model_size == "b" and patch_size == 8:
             model = vit_b8(
-                image_size=input_shape[1],
+                input_shape=input_shape,
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -135,7 +137,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 16:
             model = vit_b16(
-                image_size=input_shape[1],
+                input_shape=input_shape,
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -144,7 +146,7 @@ def get_model(
             )
         elif model_size == "b" and patch_size == 32:
             model = vit_b32(
-                image_size=input_shape[1],
+                input_shape=input_shape,
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -153,7 +155,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 16:
             model = vit_l16(
-                image_size=input_shape[1],
+                input_shape=input_shape,
                 activation="linear",
                 pretrained=True,
                 include_top=True,
@@ -162,7 +164,7 @@ def get_model(
             )
         elif model_size == "l" and patch_size == 32:
             model = vit_l32(
-                image_size=input_shape[1],
+                input_shape=input_shape,
                 activation="linear",
                 pretrained=True,
                 include_top=True,

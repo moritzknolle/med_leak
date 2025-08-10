@@ -20,6 +20,7 @@ echo "-----------------------------------"
 while $command_to_run; do
     counter=$((counter+1))
     echo "Command succesfully executed. Total successful runs: $counter"
+    echo "-----------------------------------"
 done
 
 # The loop has exited because the command failed.

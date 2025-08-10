@@ -80,7 +80,7 @@ def get_compiled_model(train_steps: int, num_classes: int = 3):
     # create model, lr schedule and optimizer
     model = get_model(
         model_name=FLAGS.model,
-        input_shape=(FLAGS.img_size[0], FLAGS.img_size[1], 3),
+        input_shape=(int(FLAGS.img_size[0]), int(FLAGS.img_size[1]), 3),
         num_classes=num_classes,
         dropout=FLAGS.dropout,
     )

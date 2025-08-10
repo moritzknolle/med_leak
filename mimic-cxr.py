@@ -93,9 +93,9 @@ def get_compiled_model(
     model = get_model(
         model_name=FLAGS.model,
         input_shape=(
-            (FLAGS.img_size[0], FLAGS.img_size[1], 1)
+            (int(FLAGS.img_size[0]), int(FLAGS.img_size[1]), 1)
             if not imagenet_weights
-            else (FLAGS.img_size[0], FLAGS.img_size[1], 3)
+            else (int(FLAGS.img_size[0]), int(FLAGS.img_size[1]), 3)
         ),
         num_classes=num_classes,
         dropout=FLAGS.dropout,
