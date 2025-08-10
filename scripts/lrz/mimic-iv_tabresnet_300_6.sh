@@ -16,9 +16,9 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash run_until_error.sh 'python mimic-iv.py \
+srun bash scripts/run_until_error.sh python mimic-iv.py \
     --eval_only=False \
     --n_runs=200 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn73mu/pn73mu-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/mimic-iv/resnet_300_6" ' \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/mimic-iv/resnet_300_6" \

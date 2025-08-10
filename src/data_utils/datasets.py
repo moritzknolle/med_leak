@@ -58,7 +58,9 @@ class BaseDataset:
         self.img_path = img_path
         self.name = name
         self.num_classes = num_classes
-        self.save_root = Path(save_root) / name
+        if not isinstance(save_root, Path):
+            save_root = Path(save_root)
+        self.save_root = save_root / name
         self.split = split
         self.in_channels = in_channels
         self.img_size = img_size

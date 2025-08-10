@@ -16,10 +16,10 @@ conda deactivate
 conda activate keras_dp
 echo "Opened virtual environment"
 
-srun bash run_until_error.sh 'python ptb-xl_dp.py \
+srun bash scripts/run_until_error.sh python ptb-xl_dp.py \
     --eval_only=False \
     --n_runs=200 \
     --epsilon=100 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/ptb-xl/dp/eps100"' \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/ptb-xl/dp/eps100" \

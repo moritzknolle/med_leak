@@ -16,11 +16,11 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash run_until_error.sh 'python chexpert.py \
+srun bash scripts/run_until_error.sh python chexpert.py \
     --eval_only=False \
     --n_runs=200 \
     --model="vit_b_16" \
     --img_size=128,128  \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/vit_b_16" '\
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/vit_b_16" \

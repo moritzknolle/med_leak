@@ -28,8 +28,9 @@ def get_model(
     Returns:
         Callable: function that returns the corresponding model
     """
-    if not isinstance(input_shape[0], int) or not isinstance(input_shape[1], int) or not isinstance(input_shape[2], int):
-        raise ValueError("expected input_shape to be a tuple of integers, got: {}".format(input_shape))
+    for a in input_shape:
+        if not isinstance(a, int):
+            raise ValueError("expected input_shape to be a tuple of integers, got: {}".format(input_shape))
     if model_name == "small_cnn":
         if dropout != 0.0:
             raise ValueError("Small CNN does not support dropout")

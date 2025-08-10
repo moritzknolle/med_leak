@@ -16,10 +16,10 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash run_until_error.sh 'python fitzpatrick.py \
+srun bash scripts/run_until_error.sh python fitzpatrick.py \
     --eval_only=False \
     --n_runs=200 \
     --model="vit_l_16" \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_l_16" '\
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/vit_l_16" \
