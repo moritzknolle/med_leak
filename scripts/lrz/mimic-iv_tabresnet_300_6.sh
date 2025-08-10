@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
 #SBATCH --job-name=mimic-iv_tabresnet_300_6
-#SBATCH --output=slurm_out/%j-%x-%t.out
+#SBATCH --output=slurm_out/%j-%x.out
 #SBATCH --mem-per-gpu=100g
 #SBATCH -p mcml-hgx-a100-80x4-mig
 #SBATCH -q mcml
@@ -16,7 +16,7 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash scripts/run_until_error.sh python mimic-iv.py \
+srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python mimic-iv.py \
     --eval_only=False \
     --n_runs=200 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \

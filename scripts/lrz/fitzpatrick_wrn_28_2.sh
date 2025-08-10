@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-task=1
 #SBATCH --job-name=fitzpatrick_wrn_28_2
-#SBATCH --output=slurm_out/%j-%x-%t.out
+#SBATCH --output=slurm_out/%j-%x.out
 #SBATCH --mem-per-gpu=100g
 #SBATCH -p mcml-hgx-a100-80x4-mig
 #SBATCH -q mcml
@@ -16,7 +16,7 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash scripts/run_until_error.sh python fitzpatrick.py \
+srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python fitzpatrick.py \
     --eval_only=False \
     --n_runs=200 \
     --model="wrn_28_2" \

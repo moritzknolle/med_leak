@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
 #SBATCH --job-name=chexpert_vit_b_16_64x64
-#SBATCH --output=slurm_out/%j-%x-%t.out
+#SBATCH --output=slurm_out/%j-%x.out
 #SBATCH --mem-per-gpu=50g
 #SBATCH -p mcml-dgx-a100-40x8
 #SBATCH -q mcml
@@ -16,7 +16,7 @@ conda deactivate
 conda activate keras
 echo "Opened virtual environment"
 
-srun bash scripts/run_until_error.sh python chexpert.py \
+srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python chexpert.py \
     --eval_only=False \
     --n_runs=200 \
     --model="vit_b_16" \
