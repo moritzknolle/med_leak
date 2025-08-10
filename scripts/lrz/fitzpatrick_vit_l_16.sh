@@ -13,7 +13,7 @@
 
 source /dss/dsshome1/03/ga92hev2/miniconda3/etc/profile.d/conda.sh
 conda deactivate
-conda activate keras
+conda activate keras_dp
 echo "Opened virtual environment"
 
 srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python fitzpatrick.py \
