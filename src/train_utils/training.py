@@ -614,8 +614,4 @@ def train_random_subset(
                     # unlock file
                     fcntl.flock(f2, fcntl.LOCK_UN)
                     pickle.dump(completed_idcs, f2)
-    if keras.backend.backend() == "jax":
-        import jax # type: ignore
-        jax.clear_caches() # this is important to prevent memory fragmentation which can otherwise slow down the next run
-        time.sleep(10)  # allow some time for the backend to clear
     wandb.run.finish()

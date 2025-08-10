@@ -44,10 +44,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/mimic-iv/resnet_300_6", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/ptb_dp/eps10", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "mimic-iv-ed",
+    "ptb-xl",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(

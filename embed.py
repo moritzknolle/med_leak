@@ -1,4 +1,4 @@
-import os, gc
+import os
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -120,7 +120,6 @@ def get_callbacks(is_ema: bool):
 def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
-    NUM_CLASSES = 4
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
 
     if FLAGS.eval_only:
@@ -135,7 +134,7 @@ def main(argv):
             overwrite_existing=True,
         )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-        model = get_compiled_model()
+        model = get_compiled_model(train_steps=STEPS)
         _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
@@ -151,54 +150,47 @@ def main(argv):
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="embed",
         )
+        raise StopIteration("Evaluation only, stopping execution.")
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="embed",
-                    img_size=IMG_SIZE,
-                    csv_root=Path("./data/csv"),
-                    data_root=Path(
-                        "/home/moritz/data_massive/embed_small/png/1024x768"
-                    ),
-                    save_root=Path(FLAGS.save_root),
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=True,
-                )
-                STEPS = (
-                    len(train_dataset)
-                    * FLAGS.subset_ratio
-                    // FLAGS.batch_size
-                    * FLAGS.epochs
-                )
-                model = get_compiled_model()
-                train_random_subset(
-                    compiled_model=model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    patient_id_col="empi_anon",
-                    batch_size=FLAGS.batch_size,
-                    aug_fn=get_aug_fn(FLAGS.augment),
-                    augment=True if FLAGS.augment != "None" else False,
-                    epochs=FLAGS.epochs,
-                    seed=FLAGS.seed,
-                    target_metric="val_auc",
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="embed",
-                )
-                del model
-                keras.backend.clear_session()
-                gc.collect()
-            except StopIteration:
-                break
-
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="embed",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path(
+                "/home/moritz/data_massive/embed_small/png/1024x768"
+            ),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=True,
+        )
+        STEPS = (
+            len(train_dataset)
+            * FLAGS.subset_ratio
+            // FLAGS.batch_size
+            * FLAGS.epochs
+        )
+        model = get_compiled_model()
+        train_random_subset(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            patient_id_col="empi_anon",
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            seed=FLAGS.seed,
+            target_metric="val_auc",
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="embed",
+        )
 
 if __name__ == "__main__":
     app.run(main)

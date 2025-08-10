@@ -14,13 +14,13 @@
 source /dss/dsshome1/03/ga92hev2/miniconda3/etc/profile.d/conda.sh
 conda deactivate
 conda activate keras
-echo 'Opened virtual environment'
+echo "Opened virtual environment"
 
-srun python chexpert.py \
+srun bash run_until_error.sh 'python chexpert.py \
     --eval_only=False \
     --n_runs=200 \
-    --model='small_cnn' \
+    --model="small_cnn" \
     --learning_rate=0.1 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/small_cnn" \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/chexpert/small_cnn" ' \

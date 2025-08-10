@@ -1,13 +1,13 @@
-import os, gc
+import os
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
 os.environ["KERAS_BACKEND"] = "jax"
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/jax_cache"
 
-import keras, jax # type: ignore
+import keras, jax  # type: ignore
 import numpy as np
-from absl import app, flags # type: ignore
+from absl import app, flags  # type: ignore
 
 from src.data_utils.constants import CXP_CHALLENGE_LABELS_IDX
 from src.data_utils.dataset_factory import get_dataset
@@ -76,7 +76,8 @@ flags.DEFINE_string(
     "Path to logdir.",
 )
 
-def get_compiled_model(train_steps:int, imagenet_weights:bool, num_classes: int = 14):
+
+def get_compiled_model(train_steps: int, imagenet_weights: bool, num_classes: int = 14):
     preprocess_fn = grayscale_to_rgb if imagenet_weights else None
     print("... preprocess_fn", preprocess_fn)
     # create model, lr schedule and optimizer
@@ -132,29 +133,31 @@ def get_callbacks(is_ema: bool):
         callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
     return callbacks
 
+
 def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    
-    if len(FLAGS.model.split("_"))>1:
+
+    if len(FLAGS.model.split("_")) > 1:
         imagenet_weights = (
-            FLAGS.model.split("_")[0] == "vit" or FLAGS.model.split("_")[1] == "imagenet"
+            FLAGS.model.split("_")[0] == "vit"
+            or FLAGS.model.split("_")[1] == "imagenet"
         )
     else:
         imagenet_weights = False
 
     if FLAGS.eval_only:
         train_dataset, test_dataset = get_dataset(
-        dataset_name="chexpert",
-        img_size=IMG_SIZE,
-        csv_root=Path("./data/csv"),
-        data_root=Path("/home/moritz/data/chexpert/"),
-        save_root=Path(FLAGS.save_root),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=False,
-    )
+            dataset_name="chexpert",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data/chexpert/"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=False,
+        )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
         _ = train_and_eval(
@@ -172,48 +175,42 @@ def main(argv):
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="chexpert",
         )
+        raise StopIteration("Evaluation only, stopping execution.")
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="chexpert",
-                    img_size=IMG_SIZE,
-                    csv_root=Path("./data/csv"),
-                    data_root=Path("/home/moritz/data/chexpert/"),
-                    save_root=Path(FLAGS.save_root),
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=False,
-                )
-                STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-                model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
-                train_random_subset(
-                    compiled_model=model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    patient_id_col="patient_id",
-                    batch_size=FLAGS.batch_size,
-                    aug_fn=get_aug_fn(FLAGS.augment),
-                    augment=True if FLAGS.augment != "None" else False,
-                    epochs=FLAGS.epochs,
-                    seed=FLAGS.seed,
-                    target_metric="val_macro_auroc(cxp)",
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="chexpert",
-                )
-                del model
-                keras.backend.clear_session()
-                jax.clear_caches()
-                gc.collect()
-            except StopIteration:
-                break
-
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="chexpert",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data/chexpert/"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=False,
+        )
+        STEPS = (
+            len(train_dataset) * FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+        )
+        model = get_compiled_model(train_steps=STEPS, imagenet_weights=imagenet_weights)
+        train_random_subset(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            patient_id_col="patient_id",
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            seed=FLAGS.seed,
+            target_metric="val_macro_auroc(cxp)",
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="chexpert",
+        )
 
 if __name__ == "__main__":
     app.run(main)

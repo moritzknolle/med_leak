@@ -1,4 +1,4 @@
-import os, gc
+import os
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -148,7 +148,7 @@ def main(argv):
 
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS)
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,
@@ -164,45 +164,38 @@ def main(argv):
             wandb_project_name="mimic-iv-ed",
         )
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="mimic-iv-ed",
-                    img_size=(0, 0),
-                    csv_root=Path("./data/csv"),
-                    data_root=None,
-                    save_root=None,
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=True,
-                )
-                STEPS = int(len(train_dataset)*FLAGS.subset_ratio) // FLAGS.batch_size * FLAGS.epochs
-                model = get_compiled_model(train_steps=STEPS)
-                train_random_subset(
-                    compiled_model=model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    patient_id_col="subject_id",
-                    batch_size=FLAGS.batch_size,
-                    aug_fn=get_aug_fn("none"),
-                    augment=False,
-                    epochs=FLAGS.epochs,
-                    target_metric="val_auc",
-                    seed=FLAGS.seed,
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="mimic-iv-ed",
-                )
-                del model
-                keras.backend.clear_session()
-                gc.collect()
-            except StopIteration:
-                break
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="mimic-iv-ed",
+            img_size=(0, 0),
+            csv_root=Path("./data/csv"),
+            data_root=None,
+            save_root=None,
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=True,
+        )
+        STEPS = int(len(train_dataset)*FLAGS.subset_ratio) // FLAGS.batch_size * FLAGS.epochs
+        model = get_compiled_model(train_steps=STEPS)
+        train_random_subset(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            patient_id_col="subject_id",
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn("none"),
+            augment=False,
+            epochs=FLAGS.epochs,
+            target_metric="val_auc",
+            seed=FLAGS.seed,
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="mimic-iv-ed",
+        )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import os, gc
+import os
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -143,46 +143,40 @@ def main(argv):
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="fairvision",
         )
+        raise StopIteration("Evaluation only, stopping execution.")
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="fairvision",
-                    img_size=IMG_SIZE,
-                    csv_root=Path("./data/csv"),
-                    data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
-                    save_root=Path(FLAGS.save_root),
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=False,
-                )
-                STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-                compiled_model = get_compiled_model()
-                train_random_subset(
-                    compiled_model=compiled_model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    batch_size=FLAGS.batch_size,
-                    patient_id_col="patient_id",
-                    aug_fn=get_aug_fn(FLAGS.augment),
-                    augment=True if FLAGS.augment != "None" else False,
-                    epochs=FLAGS.epochs,
-                    seed=FLAGS.seed,
-                    target_metric="val_auc",
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="fairvision",
-                )
-                del compiled_model
-                keras.backend.clear_session()
-                gc.collect()   
-            except StopIteration:
-                break
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="fairvision",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data_big/fairvision/FairVision"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=False,
+        )
+        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+        compiled_model = get_compiled_model()
+        train_random_subset(
+            compiled_model=compiled_model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            batch_size=FLAGS.batch_size,
+            patient_id_col="patient_id",
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            seed=FLAGS.seed,
+            target_metric="val_auc",
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="fairvision",
+        )
 
 
 if __name__ == "__main__":

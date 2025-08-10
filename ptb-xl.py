@@ -1,4 +1,4 @@
-import os, gc
+import os
 from pathlib import Path
 
 # set keras backend to jax and enable compilation caching
@@ -141,7 +141,7 @@ def main(argv):
         )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS)
-        _, _, _, _ = train_and_eval(
+        _ = train_and_eval(
             compiled_model=model,
             train_dataset=train_dataset,
             test_dataset=test_dataset,
@@ -156,46 +156,40 @@ def main(argv):
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="ptb-xl",
         )
+        raise StopIteration("Evaluation only, stopping execution.")
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="ptb-xl",
-                    img_size=(0,0),
-                    csv_root=Path("./data/csv"),
-                    data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
-                    save_root=Path(FLAGS.save_root),
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=True,
-                    )
-                STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
-                model = get_compiled_model(train_steps=STEPS)
-                train_random_subset(
-                    compiled_model=model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    patient_id_col="patient_id",
-                    batch_size=FLAGS.batch_size,
-                    aug_fn=get_aug_fn(FLAGS.augment),
-                    augment=True if FLAGS.augment != "None" else False,
-                    epochs=FLAGS.epochs,
-                    target_metric="val_macro_auroc",
-                    seed=FLAGS.seed,
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="ptb-xl",
-                )
-                del model
-                keras.backend.clear_session()
-                gc.collect()
-            except StopIteration:
-                break
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="ptb-xl",
+            img_size=(0,0),
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=True,
+            )
+        STEPS = len(train_dataset)*FLAGS.subset_ratio // FLAGS.batch_size * FLAGS.epochs
+        model = get_compiled_model(train_steps=STEPS)
+        train_random_subset(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            patient_id_col="patient_id",
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            target_metric="val_macro_auroc",
+            seed=FLAGS.seed,
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="ptb-xl",
+        )
 
 
 if __name__ == "__main__":

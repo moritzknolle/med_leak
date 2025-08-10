@@ -1,4 +1,3 @@
-import gc
 import os
 from pathlib import Path
 
@@ -118,11 +117,12 @@ def get_callbacks(is_ema: bool):
         callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
     return callbacks
 
+
 def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
     IMG_SIZE = [int(FLAGS.img_size[0]), int(FLAGS.img_size[1])]
-    
+
     if FLAGS.eval_only:
         train_dataset, test_dataset = get_dataset(
             dataset_name="fitzpatrick",
@@ -151,47 +151,40 @@ def main(argv):
             log_wandb=FLAGS.log_wandb,
             wandb_project_name="fitzpatrick",
         )
+        raise StopIteration("Evaluation only, stopping execution.")
     else:
-        while True:
-            try:
-                train_dataset, test_dataset = get_dataset(
-                    dataset_name="fitzpatrick",
-                    img_size=IMG_SIZE,
-                    csv_root=Path("./data/csv"),
-                    data_root=Path("/home/moritz/data/fitzpatrick17k"),
-                    save_root=Path(FLAGS.save_root),
-                    get_numpy=True,
-                    load_from_disk=True,
-                    overwrite_existing=False,
-                )
-                STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
-                model = get_compiled_model(train_steps=STEPS)
-                train_random_subset(
-                    compiled_model=model,
-                    train_dataset=train_dataset,
-                    test_dataset=test_dataset,
-                    patient_id_col="md5hash",
-                    batch_size=FLAGS.batch_size,
-                    aug_fn=get_aug_fn(FLAGS.augment),
-                    augment=True if FLAGS.augment != "None" else False,
-                    epochs=FLAGS.epochs,
-                    seed=FLAGS.seed,
-                    target_metric="val_auroc",
-                    logdir=Path(FLAGS.logdir),
-                    n_total_runs=FLAGS.n_runs,
-                    subset_ratio=FLAGS.subset_ratio,
-                    n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
-                    callbacks=get_callbacks(FLAGS.ema),
-                    ckpt_file_path=Path(FLAGS.ckpt_file_path),
-                    log_wandb=FLAGS.log_wandb,
-                    wandb_project_name="fitzpatrick",
-                )
-                del model
-                keras.backend.clear_session()
-                jax.clear_caches()
-                gc.collect()
-            except StopIteration:
-                break
+        train_dataset, test_dataset = get_dataset(
+            dataset_name="fitzpatrick",
+            img_size=IMG_SIZE,
+            csv_root=Path("./data/csv"),
+            data_root=Path("/home/moritz/data/fitzpatrick17k"),
+            save_root=Path(FLAGS.save_root),
+            get_numpy=True,
+            load_from_disk=True,
+            overwrite_existing=False,
+        )
+        STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
+        model = get_compiled_model(train_steps=STEPS)
+        train_random_subset(
+            compiled_model=model,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            patient_id_col="md5hash",
+            batch_size=FLAGS.batch_size,
+            aug_fn=get_aug_fn(FLAGS.augment),
+            augment=True if FLAGS.augment != "None" else False,
+            epochs=FLAGS.epochs,
+            seed=FLAGS.seed,
+            target_metric="val_auroc",
+            logdir=Path(FLAGS.logdir),
+            n_total_runs=FLAGS.n_runs,
+            subset_ratio=FLAGS.subset_ratio,
+            n_eval_views=FLAGS.eval_views if FLAGS.augment != "none" else 1,
+            callbacks=get_callbacks(FLAGS.ema),
+            ckpt_file_path=Path(FLAGS.ckpt_file_path),
+            log_wandb=FLAGS.log_wandb,
+            wandb_project_name="fitzpatrick",
+        )
 
 
 if __name__ == "__main__":
