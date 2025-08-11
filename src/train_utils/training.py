@@ -248,13 +248,14 @@ def train_and_eval(
         print("DP params:", params)
         # update wandb config with dp params
         if log_wandb:
+            print("... updating wandb config with DP params")
             if compiled_model._dp_params.noise_multiplier is None:
                 # sometimes the jax_privacy keras_api does not correctly update the field so we recompute the noise multiplier
                 noise_mult = compiled_model._dp_params.update_with_calibrated_noise_multiplier().noise_multiplier
             else:
                 noise_mult = compiled_model._dp_params.noise_multiplier
             dp_params = {
-                "epsilon": compiled_model._dp_params.epsilon,
+                "actual_epsilon": compiled_model._dp_params.epsilon,
                 "clipping_norm": compiled_model._dp_params.clipping_norm,
                 "delta": compiled_model._dp_params.delta,
                 "train_size": compiled_model._dp_params.train_size,
@@ -595,6 +596,7 @@ def train_random_subset(
                 test_logit_arr = compiled_model.predict(test_ds)
             print(f"... saving logits to disk train={train_logit_arr.shape} and test={test_logit_arr.shape}")
             success = logger.log(
+                config=dict(wandb.config),
                 train_logits=train_logit_arr,
                 train_labels=train_dataset.targets,
                 test_logits=test_logit_arr,

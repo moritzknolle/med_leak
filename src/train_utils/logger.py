@@ -46,7 +46,7 @@ class RetrainLogger:
         if not self.base_dir.exists():
             self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def save_metadata(self, train_metrics: dict, test_metrics: dict):
+    def save_metadata(self, config:dict, train_metrics: dict, test_metrics: dict):
         """
         Saves the metadata to a JSON file.
 
@@ -56,7 +56,9 @@ class RetrainLogger:
         Returns:
             bool: True if the metadata is successfully saved, False otherwise.
         """
-        self.config = dict(wandb.config)
+        if not isinstance(config, dict):
+            raise ValueError(f"Expected config as dictionary, found: {type(config)}")
+        self.config = config
         train_metrics = {k: float(v) for k, v in train_metrics.items()}
         test_metrics = {k: float(v) for k, v in test_metrics.items()}
         try:
@@ -88,6 +90,7 @@ class RetrainLogger:
 
     def log(
         self,
+        config:dict,
         train_logits: np.ndarray,
         train_labels: np.ndarray,
         test_logits: np.ndarray,
@@ -125,7 +128,9 @@ class RetrainLogger:
             print(e)
             return False
         metadata_sucess = self.save_metadata(
-            train_metrics=train_metrics, test_metrics=test_metrics
+            config=config,
+            train_metrics=train_metrics,
+            test_metrics=test_metrics
         )
         assert metadata_sucess, "Failed to save metadata"
         return True
