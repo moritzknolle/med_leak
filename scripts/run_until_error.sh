@@ -23,6 +23,9 @@ while $command_to_run; do
     echo "-----------------------------------"
 done
 
+# sync runs and delete log directories
+wandb sync --clean --clean-old-hours 0
+
 # The loop has exited because the command failed.
 echo "-----------------------------------"
 echo "Command failed on attempt $((counter+1)). Exiting."
