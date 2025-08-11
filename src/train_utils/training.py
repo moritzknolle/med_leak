@@ -169,20 +169,6 @@ def train_and_eval(
         wandb.config.update(flags.FLAGS) # type: ignore
         wandb.config.update({"run_seed": seed}) # type: ignore
         wandb.config.update({"epochs": epochs}) # type: ignore
-        if hasattr(compiled_model, "_dp_params"):
-                if compiled_model._dp_params.noise_multiplier is None:
-                    noise_mult = compiled_model._dp_params.update_with_calibrated_noise_multiplier().noise_multiplier
-                else:
-                    noise_mult = compiled_model._dp_params.noise_multiplier
-                dp_params = {
-                    "epsilon": compiled_model._dp_params.epsilon,
-                    "clipping_norm": compiled_model._dp_params.clipping_norm,
-                    "delta": compiled_model._dp_params.delta,
-                    "train_size": compiled_model._dp_params.train_size,
-                    "noise_multiplier": noise_mult,
-                    "train_steps": compiled_model._dp_params.train_steps,
-                }
-                wandb.config.update(dp_params) # type: ignore
     if subset_indices is None:
         n_train = train_dataset.__len__()
     else:
@@ -260,6 +246,22 @@ def train_and_eval(
             )
         compiled_model = keras_api.make_private(compiled_model, params)
         print("DP params:", params)
+        # update wandb config with dp params
+        if log_wandb:
+            if compiled_model._dp_params.noise_multiplier is None:
+                # sometimes the jax_privacy keras_api does not correctly update the field so we recompute the noise multiplier
+                noise_mult = compiled_model._dp_params.update_with_calibrated_noise_multiplier().noise_multiplier
+            else:
+                noise_mult = compiled_model._dp_params.noise_multiplier
+            dp_params = {
+                "epsilon": compiled_model._dp_params.epsilon,
+                "clipping_norm": compiled_model._dp_params.clipping_norm,
+                "delta": compiled_model._dp_params.delta,
+                "train_size": compiled_model._dp_params.train_size,
+                "noise_multiplier": noise_mult,
+                "train_steps": compiled_model._dp_params.train_steps,
+            }
+            wandb.config.update(dp_params) # type: ignore
 
     start_time = time.time()
 

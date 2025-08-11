@@ -23,8 +23,8 @@ while $command_to_run; do
     echo "-----------------------------------"
 done
 
-# sync runs and delete log directories
-wandb sync --clean --clean-old-hours 0
+# sync wandb runs and delete local log directories
+wandb sync --clean --clean-old-hours 0 --clean-force
 
 # The loop has exited because the command failed.
 echo "-----------------------------------"
