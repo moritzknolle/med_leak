@@ -68,6 +68,26 @@ NOISE_MULTIPLIERS = {
 
 TRAIN_SIZE=9728
 
+
+def compute_mu_poisson(
+    *, steps: int, noise_multiplier: float, sample_rate: float
+) -> float:
+    """
+    Compute mu from uniform subsampling.
+
+    Args:
+        steps: Number of steps taken
+        noise_multiplier: Noise multiplier (sigma)
+        sample_rate: Sample rate
+
+    Returns:
+        mu
+    """
+
+    return np.sqrt(np.exp(noise_multiplier ** (-2)) - 1) * np.sqrt(steps) * sample_rate
+
+
+
 def compute_mu_uniform(
     steps: int, noise_multiplier: float, sample_rate: float
 ) -> float:
@@ -96,7 +116,7 @@ def compute_mu_uniform(
 
 def calculate_auc_from_mu(mu:float) -> float:
     auc =norm.cdf(
-        (mu) / np.sqrt(1**2 + 1**2)
+        (mu) / np.sqrt(1 + 1)
     )  
     return auc
 
@@ -136,6 +156,19 @@ def get_perf_from_json(log_dir: Path, metric_name: str = "accuracy"):
     ), f"Found {len(metric_vals)} values for {metric_name} but expected {len(valid_dirs)} \n found keys: {test_metrics.keys()}"
     return metric_vals
 
+def get_label(model_name: str) -> str:
+    if model_name == "eps1":
+        return r"$\varepsilon=10^0$"
+    elif model_name == "eps10":
+        return r"$\varepsilon=10^1$"
+    elif model_name == "eps100":
+        return r"$\varepsilon=10^2$"
+    elif model_name == "eps1000":
+        return r"$\varepsilon=10^3$"
+    elif model_name == "epsinf":
+        return r"$\varepsilon=\infty $"
+    else:
+        raise ValueError(f"Unknown model name {model_name}")
 
 def main(argv):
     np.random.seed(FLAGS.r_seed)
@@ -145,10 +178,7 @@ def main(argv):
         img_size=[64, 64],
         csv_root=Path(FLAGS.csv_root),
         save_root=Path(FLAGS.save_root),
-        data_root=Path(""),
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=True,
+        data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
     )
     LOG_DIRS = PTB_LOG_DIRS if FLAGS.dataset_name == "ptb-xl" else 0
     test_metric_name = (
@@ -191,19 +221,24 @@ def main(argv):
             patient_ids = train_dataset.dataframe[patient_col]
             patient_auc_df = aggregate_by_patient(aucs=aucs, patient_ids=patient_ids)
             aucs = patient_auc_df["max"]
-        auc_bound = calculate_auc_from_mu(
-            compute_mu_uniform(
-                steps=(TRAIN_SIZE//1024)*200,
-                noise_multiplier=NOISE_MULTIPLIERS[model_name],
-                sample_rate=1024 / TRAIN_SIZE,
+        if model_name != "epsinf":
+            mu = compute_mu_poisson(
+                    steps=(TRAIN_SIZE//1024)*200,
+                    noise_multiplier=NOISE_MULTIPLIERS[model_name],
+                    sample_rate=1024 / TRAIN_SIZE,
+                )
+            print(f"..... model {model_name} is mu-GDP with mu={mu:.3f}")
+            auc_bound = calculate_auc_from_mu(
+                mu
             )
-        )
+        else:
+            auc_bound=1.0 # no bound for infinite epsilon
         res = scipy.stats.ecdf(aucs)
         conf = res.sf.confidence_interval(confidence_level=0.95)
         res.sf.plot(
             ax=axes[0],
             color=COLORS[model_name],
-            label=f"{model_name}({np.mean(aucs):.2f}) [{auc_bound:.2f}]",
+            label=f"{get_label(model_name)} ({np.mean(aucs):.2f})[{auc_bound:.2f}]",
             alpha=0.8,
         )
         conf.low.plot(
@@ -212,15 +247,15 @@ def main(argv):
         conf.high.plot(
             ax=axes[0], color=COLORS[model_name], linestyle="--", lw=1, alpha=0.8
         )
-        axes[0].axvline(
-            auc_bound,
-            color=COLORS[model_name],
-            linestyle="dotted",
-            lw=1,
-            alpha=0.8,
-        )
+        # axes[0].axvline(
+        #     auc_bound,
+        #     color=COLORS[model_name],
+        #     linestyle="dotted",
+        #     lw=1,
+        #     alpha=0.8,
+        # )
         print(
-            f"Computed DP bound for {model_name} with mu={auc_bound:.3f} and noise_multiplier={NOISE_MULTIPLIERS[model_name]}.")
+            f"\n****** Computed DP bound: AUC={auc_bound:3f} for {model_name} with mu={mu:.3f} and noise_multiplier={NOISE_MULTIPLIERS[model_name]}.\n")
     axes[1].bar(
         range(len(LOG_DIRS)),
         test_metric_means,
@@ -229,8 +264,8 @@ def main(argv):
         capsize=2,
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
-    #axes[1].set_xticklabels(["10e1", "10e2", "10e3", r"$\infty$"], rotation=90)
-    axes[1].set_xticklabels([])
+    axes[1].set_xticklabels([r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"])
+    #axes[1].set_xticklabels([])
     axes[1].set_xlabel(r"Privacy Budget ($\varepsilon$)")
     axes[1].set_ylabel("Diagnostic Performance")
     axes[1].grid(False)

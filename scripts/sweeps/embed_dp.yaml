@@ -1,0 +1,18 @@
+program: embed_dp.py
+name: 'clipping_norm'
+method: grid
+project: embed_dp
+metric:
+  name: _val_auc
+  goal: maximize
+parameters:
+  clipping_norm:
+    values: [1, 10, 50, 100, 1_000]
+  epochs:
+    value: 5 
+  eval_only:
+    value: False
+  logdir:
+    value: "./logs/embed_test_dp/"
+  log_wandb:
+    value: True
