@@ -16,16 +16,16 @@ from src.train_utils.utils import MyCosineDecay, get_aug_fn
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "Number of training epochs.")
-flags.DEFINE_float("learning_rate", 5e-3, "Learning rate.")
-flags.DEFINE_float("weight_decay", 1e-4, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 256, "Batch size.")
+flags.DEFINE_float("learning_rate", 1e-3, "Learning rate.")
+flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
+flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
     "ema", True, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "small_cnn", "Name of the model to use.")
-flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
+flags.DEFINE_string("model", "wrn_28_2", "Name of the model to use.")
+flags.DEFINE_enum("lr_schedule", "constant", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup", 0.05, "Relative steps to perform linear learning rate warmup."
 )
@@ -79,7 +79,7 @@ flags.DEFINE_float(
     "epsilon", np.inf, "Privacy budget parameter epsilon for DP training."
 )
 flags.DEFINE_float(
-    "clipping_norm", 50_000, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 1_000, "Clipping norm for DP training (gradient clipping)."
 )
 
 def get_compiled_model(train_steps: int, num_classes: int = 3):
@@ -95,11 +95,10 @@ def get_compiled_model(train_steps: int, num_classes: int = 3):
         steps=int(FLAGS.decay_steps * train_steps),
         relative_lr_warmup_steps=FLAGS.lr_warmup,
     )
-    opt = keras.optimizers.SGD(
+    opt = keras.optimizers.AdamW(
         learning_rate=(
             schedule if FLAGS.lr_schedule == "cosine" else FLAGS.learning_rate
         ),
-        momentum=0.9,
         weight_decay=FLAGS.weight_decay,
         use_ema=FLAGS.ema,
         ema_momentum=FLAGS.ema_decay,
@@ -117,12 +116,23 @@ def get_compiled_model(train_steps: int, num_classes: int = 3):
     return model
 
 
-def get_callbacks(is_ema: bool):
-    callbacks = []
+def get_callbacks(is_ema: bool, reduce_lr_plateau: bool = True):
+    callbacks = (
+        [
+            keras.callbacks.ReduceLROnPlateau(
+                monitor="val_auroc",
+                factor=0.5,
+                patience=5,
+                cooldown=5,
+                verbose=True,
+            )
+        ]
+        if reduce_lr_plateau
+        else []
+    )
     if is_ema:
         callbacks += [keras.callbacks.SwapEMAWeights(swap_on_epoch=True)]
     return callbacks
-
 
 def main(argv):
     if FLAGS.mixed_precision:
