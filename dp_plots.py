@@ -40,23 +40,23 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("dataset_name", "ptb-xl", "Name of the dataset to plot data for ('ptb-xl' or '?').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
-    "ylim_upper", 0.935, "upper y-limit for test performance metric plot"
+    "ylim_upper", 0.93, "upper y-limit for test performance metric plot"
 )
-flags.DEFINE_float("ylim_lower", 0.8, "lower y-limit for test performance metric plot")
+flags.DEFINE_float("ylim_lower", 0.75, "lower y-limit for test performance metric plot")
 
 PTB_LOG_DIRS = {
-    #"eps1": "./logs/ptb-xl/dp/eps1",
+    "eps1": "./logs/ptb-xl/dp/eps1",
     "eps10": "./logs/ptb-xl/dp/eps10",
     "eps100": "./logs/ptb-xl/dp/eps100",
     "eps1000": "./logs/ptb-xl/dp/eps1000",
     "epsinf": "./logs/ptb-xl/dp/epsinf",
 }
 COLORS = {
-    "eps1": "#d6c4e9",
-    "eps10": "#cab2e2",
-    "eps100": "#996ac6",
-    "eps1000": "#6b3a98",
-    "epsinf": "#4e2b70",
+    "eps1": "#d8c7ea",
+    "eps10": "#BE93EC",
+    "eps100": "#9063C1",
+    "eps1000": "#643893",
+    "epsinf": "#462666",
 }
 NOISE_MULTIPLIERS = {
     "eps1": 14.901956181711261,
@@ -122,12 +122,27 @@ def calculate_auc_from_mu(mu:float) -> float:
 
 def calculate_dp_bound(logdir: Path):
     valid_dirs = [l for l in logdir.iterdir() if l.is_dir()]
-    print(valid_dirs)
     with open(valid_dirs[0] / "info.json", "r") as f:
         config = json.load(f)["wandb_config"]
-        clip_norm = config["clipping_norm"]
+        if config["dp"] == False:
+            return 1.0
         noise_multiplier = config["noise_multiplier"]
+        clipping_norm = config["clipping_norm"]
         batch_size = config["batch_size"]
+        train_size = config["train_size"]
+        train_steps = config["train_steps"]
+    sample_rate = batch_size / train_size
+    mu = compute_mu_poisson(
+        steps=train_steps,
+        noise_multiplier=noise_multiplier,
+        sample_rate=sample_rate,
+    )
+    print(
+        f"\n******** Computed mu={mu:.3f} for logdir {logdir}, noise_multiplier={noise_multiplier}, batch_size={batch_size}, train_size={train_size}, train_steps={train_steps}"
+    )
+    auc_bound = calculate_auc_from_mu(mu)
+    print(f"******** Computed DP bound: AUC={auc_bound:.3f} for mu={mu:.3f} \n")
+    return auc_bound
 
 
 def get_perf_from_json(log_dir: Path, metric_name: str = "accuracy"):
@@ -189,7 +204,7 @@ def main(argv):
     )
     load_func = partial(load_score, logit_transform_func=logit_transform_func)
     fig, axes = plt.subplots(
-        1, 2, figsize=(3.5, 2), layout="tight", width_ratios=[1.7, 1.0]
+        1, 2, figsize=(3.55, 2), layout="tight", width_ratios=[1.65, 1.0]
     )
     test_metric_means, test_metric_stds = [], []
     for model_name, base_dir in LOG_DIRS.items():
@@ -221,18 +236,7 @@ def main(argv):
             patient_ids = train_dataset.dataframe[patient_col]
             patient_auc_df = aggregate_by_patient(aucs=aucs, patient_ids=patient_ids)
             aucs = patient_auc_df["max"]
-        if model_name != "epsinf":
-            mu = compute_mu_poisson(
-                    steps=(TRAIN_SIZE//1024)*200,
-                    noise_multiplier=NOISE_MULTIPLIERS[model_name],
-                    sample_rate=1024 / TRAIN_SIZE,
-                )
-            print(f"..... model {model_name} is mu-GDP with mu={mu:.3f}")
-            auc_bound = calculate_auc_from_mu(
-                mu
-            )
-        else:
-            auc_bound=1.0 # no bound for infinite epsilon
+        auc_bound = calculate_dp_bound(base_dir)
         res = scipy.stats.ecdf(aucs)
         conf = res.sf.confidence_interval(confidence_level=0.95)
         res.sf.plot(
@@ -254,8 +258,6 @@ def main(argv):
         #     lw=1,
         #     alpha=0.8,
         # )
-        print(
-            f"\n****** Computed DP bound: AUC={auc_bound:3f} for {model_name} with mu={mu:.3f} and noise_multiplier={NOISE_MULTIPLIERS[model_name]}.\n")
     axes[1].bar(
         range(len(LOG_DIRS)),
         test_metric_means,
@@ -264,7 +266,7 @@ def main(argv):
         capsize=2,
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
-    axes[1].set_xticklabels([r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"])
+    axes[1].set_xticklabels([r"$10^0$", r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
     #axes[1].set_xticklabels([])
     axes[1].set_xlabel(r"Privacy Budget ($\varepsilon$)")
     axes[1].set_ylabel("Diagnostic Performance")

@@ -49,7 +49,7 @@ FITZ_LOG_DIRS = {
     "VIT-B/16-64": "./logs/fitzpatrick/vit_b_16",
     "VIT-B/16-128": "./logs/fitzpatrick/vit_b_16_128x128",
     "VIT-L/16-64": "./logs/fitzpatrick/vit_l_16",
-    #"VIT-L/16-128": "./logs/fitzpatrick/vit_l_16",
+    "VIT-L/16-128": "./logs/fitzpatrick/vit_l_16",
 }
 COLORS = {
     "CNN": "red",
