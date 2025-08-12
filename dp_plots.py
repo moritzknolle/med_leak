@@ -8,6 +8,7 @@ import numpy as np
 import scipy
 from absl import app, flags
 from scipy.stats import norm
+from dp_accounting.pld import privacy_loss_distribution
 
 from mem_inf_stats import get_patient_col
 from src.data_utils.dataset_factory import get_dataset
@@ -65,44 +66,9 @@ NOISE_MULTIPLIERS = {
     "eps1000": 0.2787387586165937,
     "epsinf": 0.00000001,
 }
-
-TRAIN_SIZE=9728
-
-
-def compute_mu_poisson(
-    *, steps: int, noise_multiplier: float, sample_rate: float
-) -> float:
-    """
-    Compute mu from uniform subsampling.
-
-    Args:
-        steps: Number of steps taken
-        noise_multiplier: Noise multiplier (sigma)
-        sample_rate: Sample rate
-
-    Returns:
-        mu
-    """
-
-    return np.sqrt(np.exp(noise_multiplier ** (-2)) - 1) * np.sqrt(steps) * sample_rate
-
-
-
 def compute_mu_uniform(
     steps: int, noise_multiplier: float, sample_rate: float
 ) -> float:
-    """
-    Compute mu from uniform subsampling.
-
-    Args:
-        steps: Number of steps taken
-        noise_multiplier: Noise multiplier (sigma)
-        sample_rate: Sample rate
-
-    Returns:
-        mu
-    """
-
     c = sample_rate * np.sqrt(steps)
     return (
         np.sqrt(2)
@@ -120,28 +86,68 @@ def calculate_auc_from_mu(mu:float) -> float:
     )  
     return auc
 
+def get_privacy_profile(eps:np.ndarray, sigma:float, p:float, steps:int)-> np.ndarray:
+    mech = privacy_loss_distribution.from_gaussian_mechanism(
+        standard_deviation=sigma,
+        sampling_prob=p,
+    ).self_compose(steps)
+    return mech.get_delta_for_epsilon(eps)
+
+def profile2tradeoff(alpha, eps, delta):
+    "Equation (5) in https://arxiv.org/pdf/1905.02383"
+    term1 = 1.0 - delta - np.exp(eps)*alpha
+    term2 = (1.0 - delta - alpha)*np.exp(-eps)
+    return np.maximum(0.0, np.maximum(term1, term2))
+
+def ADP2fDP(alphas, epsilons, deltas):
+    "Privacy Profile to Trade-off Function"
+    betas = []
+    for alpha in alphas:
+        B = profile2tradeoff(alpha, np.asarray(epsilons), np.asarray(deltas))
+        betas.append(np.max(B))
+    return np.array(betas)
+
+def compute_auc(alphas, betas, plot:bool=True, name:str=""):
+    powers = 1 - betas  # TPR@alpha
+    auc = np.trapezoid(powers, alphas)
+    if plot:
+        plt.figure()
+        plt.plot(alphas, powers)
+        plt.xlabel("alpha")
+        plt.ylabel("TPR@alpha")
+        plt.plot([0, 1],[0, 1],color="black",linestyle="--",alpha=0.5)
+        plt.title(f"AUC={auc:.3f}")
+        plt.savefig(f"./figs/tradeoff_auc_{name}.pdf", bbox_inches="tight")
+    return auc
+
 def calculate_dp_bound(logdir: Path):
     valid_dirs = [l for l in logdir.iterdir() if l.is_dir()]
     with open(valid_dirs[0] / "info.json", "r") as f:
         config = json.load(f)["wandb_config"]
         if config["dp"] == False:
             return 1.0
-        noise_multiplier = config["noise_multiplier"]
-        clipping_norm = config["clipping_norm"]
-        batch_size = config["batch_size"]
+        epsilon = config["epsilon"]
         train_size = config["train_size"]
-        train_steps = config["train_steps"]
+        batch_size = config["batch_size"]
+        noise_multiplier = config["noise_multiplier"]
+        steps = config["train_steps"]
+        delta = 1/ train_size
     sample_rate = batch_size / train_size
-    mu = compute_mu_poisson(
-        steps=train_steps,
-        noise_multiplier=noise_multiplier,
-        sample_rate=sample_rate,
-    )
-    print(
-        f"\n******** Computed mu={mu:.3f} for logdir {logdir}, noise_multiplier={noise_multiplier}, batch_size={batch_size}, train_size={train_size}, train_steps={train_steps}"
-    )
-    auc_bound = calculate_auc_from_mu(mu)
-    print(f"******** Computed DP bound: AUC={auc_bound:.3f} for mu={mu:.3f} \n")
+    # for small epsilon we use the privacy profile to compute the AUC bound
+    if epsilon <= 15:
+        alphas = np.linspace(0, 1, 10_000)
+        epsila = np.linspace(-10, 10, 5000)
+        pprofile = get_privacy_profile(eps=epsila, sigma=noise_multiplier, p=sample_rate, steps=steps)
+        betas = ADP2fDP(alphas, epsila, pprofile)
+        auc_bound = compute_auc(alphas, betas, name=f"eps={epsilon}", plot=False)
+        print(f"\n******** Computed AUC bound using privacy profile: AUC={auc_bound:.3f} for (eps,delta)-DP with eps={epsilon:.3f}, delta={1/train_size:.1e}\n")
+    # otherwise we compute a cheaper bound using mu-GDP and a CLT assumption which is tight enough for large epsilon
+    else:
+        mu = compute_mu_uniform(
+            steps=steps, noise_multiplier=noise_multiplier, sample_rate=sample_rate
+        )
+        auc_bound = calculate_auc_from_mu(mu)
+        print(f"\n******** Computed AUC bound using mu-GDP: AUC={auc_bound:.3f} for (eps,delta)-DP with eps={epsilon:.3f}, delta={1/train_size:.1e}\n")
     return auc_bound
 
 

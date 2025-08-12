@@ -24,6 +24,7 @@ from ..data_utils.constants import (
     FITZPATRICK_LABELS_COARSE_SHORT,
     EMBED_EXAM_LABELS,
     EMBED_EXAM_LABELS_BIRADS,
+    ECG_LABELS,
 )
 from ..data_utils.datasets import BaseDataset
 from .common import aggregate_by_patient
@@ -660,6 +661,22 @@ def disease_group_plots(dataset_name: str, results_df: pd.DataFrame, out_path: P
             xlabel="BIRADS Assesment",
             col_vals=[str(x) for x in EMBED_EXAM_LABELS_BIRADS],
         )
+    elif dataset_name == "mimic-iv-ed":
+        composition_comparison_plot(
+            df=results_df,
+            group_col="outcome_hospitalization",
+            save_path=out_path / f"{dataset_name}_composition_plot_disease.pdf",
+            xlabel="Hospitalization Outcome",
+            col_vals=["False", "True"],
+        )
+    elif dataset_name == "ptb-xl":
+        color_dict = {a:None for a in ECG_LABELS}
+        composition_comparison_plot_overlapping_groups(
+            df=results_df,
+            group_cols=ECG_LABELS,
+            save_path=out_path / f"{dataset_name}_composition_plot_disease.pdf",
+            xlabel="Disease",
+        )
     else:
         raise ValueError("Dataset not supported")
 
@@ -1017,18 +1034,6 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             xlabel="Race",
             col_vals=["Black", "White", "Asian"],
         )
-        # check if the race effect is confounded by insurance type
-        filtered_df = results_df[
-            results_df["eci_Obesity"]==0
-        ]  # only Medicare patients
-        composition_comparison_plot(
-            df=filtered_df,
-            group_col="race",
-            color_dict=CXR_COLORS,
-            save_path=out_path / f"{dataset_name}_composition_plot_race@NotObese.pdf",
-            xlabel="Race",
-            col_vals=["Black", "White", "Asian"],
-        )
         composition_comparison_plot(
             df=results_df,
             group_col="cci_Cancer1",
@@ -1051,6 +1056,27 @@ def subgroup_plots(dataset_name: str, results_df: pd.DataFrame, out_path: Path):
             color_dict={0: None, 1:None},
             save_path=out_path / f"{dataset_name}_composition_plot_obesity.pdf",
             xlabel="Obesity Status",
+            col_vals=["0", "1"],
+        )
+    elif dataset_name == "ptb-xl":
+        print(results_df)
+        results_df["extra_beat_binary"] = 0
+        results_df.loc[~results_df["extra_beats"].isna(), "extra_beat_binary"] = 1
+        print(results_df["extra_beat_binary"].value_counts())
+        composition_comparison_plot(
+            df=results_df,
+            group_col="sex",
+            color_dict={0: None, 1:None},
+            save_path=out_path / f"{dataset_name}_composition_plot_sex.pdf",
+            xlabel="Sex",
+            col_vals=["0", "1"],
+        )
+        composition_comparison_plot(
+            df=results_df,
+            group_col="extra_beat_binary",
+            color_dict={0: None, 1:None},
+            save_path=out_path / f"{dataset_name}_composition_plot_extra_beat.pdf",
+            xlabel="Extra Beats",
             col_vals=["0", "1"],
         )
     else:

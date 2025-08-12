@@ -44,10 +44,10 @@ plt.rcParams.update(
 color_a = "#7c8483"
 color_b = "#982649"
 
-flags.DEFINE_string("logdir", "./logs/ptb_dp/eps10", "The log directory.")
+flags.DEFINE_string("logdir", "./logs/mimic-iv/resnet_300_6", "The log directory.")
 flags.DEFINE_string(
     "dataset",
-    "ptb-xl",
+    "mimic-iv-ed",
     "The dataset to analyse. This script will try to look for log directories at FLAGS.logdir",
 )
 flags.DEFINE_string(
@@ -95,7 +95,7 @@ flags.DEFINE_float(
 )
 flags.DEFINE_bool(
     "find_optimal_a",
-    False,
+    True,
     "Whether to perform a grid search to find the optimal value of a.",
 )
 flags.DEFINE_bool(
@@ -112,7 +112,6 @@ flags.DEFINE_boolean(
 flags.DEFINE_integer("threads", 16, "Number of threads to use for multiprocessing.")
 flags.DEFINE_integer("seed", 21, "Random seed.")
 FLAGS = flags.FLAGS
-
 
 
 
