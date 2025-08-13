@@ -4,7 +4,7 @@
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-task=1
-#SBATCH --job-name=fitzpatrick_eps1000
+#SBATCH --job-name=embed_eps10
 #SBATCH --output=slurm_out/%j-%x.out
 #SBATCH --mem-per-gpu=50g
 #SBATCH -p mcml-dgx-a100-40x8
@@ -16,10 +16,10 @@ conda deactivate
 conda activate keras_dp
 echo "Opened virtual environment"
 
-srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python fitzpatrick_dp.py \
+srun --output=slurm_out/%j-%x-%t.out bash scripts/run_until_error.sh python embed_dp.py \
     --eval_only=False \
     --n_runs=200 \
-    --epsilon=1000 \
+    --epsilon=10 \
     --save_root="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/npy" \
     --ckpt_file_path="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/ckpts" \
-    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/fitzpatrick/dp/eps1000" \
+    --logdir="/dss/dssmcmlfs01/pn67bo/pn67bo-dss-0000/moritz/logs/embed/dp/eps10" \

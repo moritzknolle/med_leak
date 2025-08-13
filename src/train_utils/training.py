@@ -62,7 +62,7 @@ def prepare_dataset(
         )
         targets = targets.astype(np.float32)
     if batch_size > len(inputs):
-        print("... found batch size larger than dataset size, setting batch size to dataset size")
+        print(f"... found batch size ({batch_size}) larger than dataset size ({inputs.shape}), setting batch size to dataset size")
         batch_size = len(inputs)
     if subset_indices is not None:
         print(f"... using {len(subset_indices)/len(inputs)*100:.1f}% subset of the dataset")

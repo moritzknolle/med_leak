@@ -14,17 +14,17 @@ from src.train_utils.training import train_and_eval, train_random_subset
 from src.train_utils.utils import MyCosineDecay, get_aug_fn, grayscale_to_rgb
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 30, "Number of training steps.")
+flags.DEFINE_integer("epochs", 10, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 3e-3, "Learning rate.")
 flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
-flags.DEFINE_integer("batch_size", 256, "Batch size.")
+flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("log_wandb", True, "Whether to log metrics to weights & biases.")
 flags.DEFINE_boolean(
-    "ema", True, "Whether to use exponential moving average for parameters."
+    "ema", False, "Whether to use exponential moving average for parameters."
 )
-flags.DEFINE_string("model", "small_cnn", "Name of the model to use.")
-flags.DEFINE_enum("lr_schedule", "cosine", ["constant", "cosine"], "LR schedule.")
+flags.DEFINE_string("model", "wrn_28_2", "Name of the model to use.")
+flags.DEFINE_enum("lr_schedule", "constant", ["constant", "cosine"], "LR schedule.")
 flags.DEFINE_float(
     "lr_warmup", 0.1, "Relative steps to perform linear learning rate warmup."
 )
@@ -77,7 +77,7 @@ flags.DEFINE_float(
     "epsilon", np.inf, "Privacy budget parameter epsilon for DP training."
 )
 flags.DEFINE_float(
-    "clipping_norm", 50_000, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 1_000, "Clipping norm for DP training (gradient clipping)."
 )
 
 def get_compiled_model(train_steps: int, num_classes: int = 4):
