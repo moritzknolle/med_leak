@@ -123,16 +123,6 @@ def get_callbacks(is_ema: bool):
 def main(argv):
     if FLAGS.mixed_precision:
         keras.mixed_precision.set_global_policy("mixed_float16")
-    train_dataset, test_dataset = get_dataset(
-        dataset_name="mimic-iv-ed",
-        img_size=(0, 0),
-        csv_root=Path("./data/csv"),
-        data_root=None,
-        save_root=None,
-        get_numpy=True,
-        load_from_disk=True,
-        overwrite_existing=True,
-    )
 
     if FLAGS.eval_only:
         train_dataset, test_dataset = get_dataset(
@@ -143,7 +133,7 @@ def main(argv):
             save_root=None,
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
 
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
@@ -172,7 +162,7 @@ def main(argv):
             save_root=None,
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
         STEPS = int(len(train_dataset)*FLAGS.subset_ratio) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS)

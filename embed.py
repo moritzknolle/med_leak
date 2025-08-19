@@ -131,7 +131,7 @@ def main(argv):
             save_root=Path(FLAGS.save_root),
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS)
@@ -162,7 +162,7 @@ def main(argv):
             save_root=Path(FLAGS.save_root),
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
         STEPS = (
             len(train_dataset)

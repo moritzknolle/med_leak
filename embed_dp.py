@@ -14,7 +14,7 @@ from src.train_utils.training import train_and_eval, train_random_subset
 from src.train_utils.utils import MyCosineDecay, get_aug_fn, grayscale_to_rgb
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epochs", 10, "Number of training steps.")
+flags.DEFINE_integer("epochs", 20, "Number of training steps.")
 flags.DEFINE_float("learning_rate", 3e-3, "Learning rate.")
 flags.DEFINE_float("weight_decay", 0.0, "L2 weight decay.")
 flags.DEFINE_integer("batch_size", 512, "Batch size.")
@@ -33,7 +33,7 @@ flags.DEFINE_float(
     1.0,
     "Relative fraction of total steps until learning rate is decayed to 1/10 times the original value. A value smaller than one means faster decay and likewise a bigger value leads to slower decay.",
 )
-flags.DEFINE_float("ema_decay", 0.995, "EMA decay.")
+flags.DEFINE_float("ema_decay", 0.7, "EMA decay.")
 flags.DEFINE_integer("grad_accum_steps", 1, "Number of gradient accumulation steps.")
 flags.DEFINE_float("dropout", 0.0, "Dropout rate.")
 flags.DEFINE_string(
@@ -77,7 +77,7 @@ flags.DEFINE_float(
     "epsilon", np.inf, "Privacy budget parameter epsilon for DP training."
 )
 flags.DEFINE_float(
-    "clipping_norm", 1_000, "Clipping norm for DP training (gradient clipping)."
+    "clipping_norm", 10_000, "Clipping norm for DP training (gradient clipping)."
 )
 
 def get_compiled_model(train_steps: int, num_classes: int = 4):
@@ -135,7 +135,7 @@ def main(argv):
             save_root=Path(FLAGS.save_root),
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
         STEPS = len(train_dataset) // FLAGS.batch_size * FLAGS.epochs
         model = get_compiled_model(train_steps=STEPS)
@@ -169,7 +169,7 @@ def main(argv):
             save_root=Path(FLAGS.save_root),
             get_numpy=True,
             load_from_disk=True,
-            overwrite_existing=True,
+            overwrite_existing=False,
         )
         STEPS = (
             len(train_dataset)
