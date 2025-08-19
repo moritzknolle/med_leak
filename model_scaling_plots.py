@@ -36,7 +36,7 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "chexpert", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
+flags.DEFINE_string("dataset_name", "fitzpatrick", "Name of the dataset to plot data for ('chexpert' or 'fitzpatrick').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
     "ylim_upper", 0.935, "upper y-limit for test performance metric plot"
@@ -49,7 +49,6 @@ FITZ_LOG_DIRS = {
     "VIT-B/16-64": "./logs/fitzpatrick/vit_b_16",
     "VIT-B/16-128": "./logs/fitzpatrick/vit_b_16_128x128",
     "VIT-L/16-64": "./logs/fitzpatrick/vit_l_16",
-    "VIT-L/16-128": "./logs/fitzpatrick/vit_l_16",
 }
 COLORS = {
     "CNN": "red",
@@ -66,7 +65,14 @@ CHEX_LOGDIRS = {
     "VIT-B/16-64": "./logs/chexpert/vit_b_16_64x64",
     "VIT-B/16-128": "./logs/chexpert/vit_b_16",
     "VIT-L/16-64": "./logs/chexpert/vit_l_16_64x64",
-    #"VIT-L/16-128": "./logs/chexpert/vit_l_16",
+}
+
+MODEL_SIZE = {
+    "WRN-28-2": "1.5",
+    "WRN-40-4": "9",
+    "VIT-B/16-64": "86",
+    "VIT-B/16-128": "86",
+    "VIT-L/16-64": "303",
 }
 
 
@@ -117,7 +123,7 @@ def main(argv):
     )
     load_func = partial(load_score, logit_transform_func=logit_transform_func)
     fig, axes = plt.subplots(
-        1, 2, figsize=(3.5, 2), layout="tight", width_ratios=[1.7, 1.0]
+        1, 2, figsize=(3.6, 2.1), layout="tight", width_ratios=[1.7, 1.1]
     )
     test_metric_means, test_metric_stds = [], []
     for model_name, base_dir in LOG_DIRS.items():
@@ -172,12 +178,13 @@ def main(argv):
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
     # axes[1].set_xticklabels(LOG_DIRS.keys(), rotation=45)
-    axes[1].set_xticklabels([])
-    axes[1].set_xlabel("Model")
+    axes[1].set_xticklabels([MODEL_SIZE[model_name] for model_name in LOG_DIRS.keys()])
+    #axes[1].ticklabel_format(useMathText=True)
+    axes[1].set_xlabel("Model Size\n(Million Parameters)")
     axes[1].set_ylabel("Diagnostic Performance")
     axes[1].grid(False)
     axes[1].set_ylim((FLAGS.ylim_lower, FLAGS.ylim_upper))
-    axes[0].legend(loc="upper right", framealpha=0.5)
+    #axes[0].legend(loc="upper right", framealpha=0.5)
     axes[0].set_xlim((0.475, 1.01))
     ylim = 1 / len(aucs)
     axes[0].set_ylim((ylim, 1))

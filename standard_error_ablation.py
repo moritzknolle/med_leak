@@ -59,7 +59,7 @@ color_b = "#982649"
 LOGDIRS = {
     "chexpert": "./logs/chexpert/wrn_28_2",
     "mimic": "./logs/mimic/wrn_28_2",
-    "mimic-iv-ed": "./logs/mimic-iv-ed/resnet_275_6",
+    "mimic-iv-ed": "./logs/mimic-iv/resnet_300_6",
     "embed": "./logs/embed/wrn_28_2",
     "fairvision": "./logs/fairvision/wrn_28_2",
     "fitzpatrick": "./logs/fitzpatrick/wrn_28_2",

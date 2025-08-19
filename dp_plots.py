@@ -5,10 +5,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt #type: ignore
 import numpy as np
-import scipy
-from absl import app, flags
-from scipy.stats import norm
-from dp_accounting.pld import privacy_loss_distribution
+import scipy #type: ignore
+from absl import app, flags #type: ignore
+from scipy.stats import norm #type: ignore
+from dp_accounting.pld import privacy_loss_distribution #type: ignore
 
 from mem_inf_stats import get_patient_col
 from src.data_utils.dataset_factory import get_dataset
@@ -39,10 +39,10 @@ plt.rcParams.update(
     }
 )
 FLAGS = flags.FLAGS
-flags.DEFINE_string("dataset_name", "ptb-xl", "Name of the dataset to plot data for ('ptb-xl' or '?').")
+flags.DEFINE_string("dataset_name", "ptb-xl", "Name of the dataset to plot data for ('ptb-xl' or 'embed').")
 flags.DEFINE_integer("r_seed", 21, "Random seed.")
 flags.DEFINE_float(
-    "ylim_upper", 0.93, "upper y-limit for test performance metric plot"
+    "ylim_upper", 0.95, "upper y-limit for test performance metric plot"
 )
 flags.DEFINE_float("ylim_lower", 0.75, "lower y-limit for test performance metric plot")
 
@@ -53,14 +53,16 @@ PTB_LOG_DIRS = {
     "eps1000": "./logs/ptb-xl/dp/eps1000",
     "epsinf": "./logs/ptb-xl/dp/epsinf",
 }
-FITZ_LOG_DIRS = {
-    "eps5": "./logs/fitzpatrick/dp/eps5",
-    "eps10": "./logs/fitzpatrick/dp/eps10",
-    "eps100": "./logs/fitzpatrick/dp/eps100",
-    "eps1000": "./logs/fitzpatrick/dp/eps1000",
-    "epsinf": "./logs/fitzpatrick/dp/epsinf",
+EMBED_LOG_DIRS = {
+    "eps1": "./logs/embed/dp/eps1",
+    "eps5": "./logs/embed/dp/eps5",
+    "eps10": "./logs/embed/dp/eps10",
+    "eps100": "./logs/embed/dp/eps100",
+    "eps1000": "./logs/embed/dp/eps1000",
+    "epsinf": "./logs/embed/dp/epsinf",
 }
 COLORS = {
+    "eps1": "#f0b7a4",
     "eps5": "#d8c7ea",
     "eps10": "#BE93EC",
     "eps100": "#9063C1",
@@ -204,9 +206,9 @@ def main(argv):
         save_root=Path(FLAGS.save_root),
         data_root=get_data_root(FLAGS.dataset_name),
     )
-    LOG_DIRS = PTB_LOG_DIRS if FLAGS.dataset_name == "ptb-xl" else FITZ_LOG_DIRS
+    LOG_DIRS = PTB_LOG_DIRS if FLAGS.dataset_name == "ptb-xl" else EMBED_LOG_DIRS
     test_metric_name = (
-        "_val_macro_auroc" if FLAGS.dataset_name == "ptb-xl" else "_val_auroc"
+        "_val_macro_auroc" if FLAGS.dataset_name == "ptb-xl" else "_val_auc"
     )
     logit_transform_func = partial(
         loss_logit_transform_multiclass, is_mimic_or_chexpert=False
@@ -223,7 +225,7 @@ def main(argv):
         test_metric_means.append(np.mean(test_metric_vals))
         test_metric_stds.append(np.std(test_metric_vals))
         print(
-            f"... average test {test_metric_name} for {model_name}: {np.mean(test_metric_vals)}"
+            f"... test {test_metric_name} for {model_name}: {np.mean(test_metric_vals):.3f} ± {np.std(test_metric_vals):.3f}"
         )
         scores, masks, _ = compute_scores(
             log_dirs=logdirs,
@@ -275,7 +277,10 @@ def main(argv):
         capsize=2,
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
-    axes[1].set_xticklabels([5, r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
+    if len(LOG_DIRS) == 6:
+        axes[1].set_xticklabels([1, 5, r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
+    else:
+         axes[1].set_xticklabels([5, r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
     #axes[1].set_xticklabels([])
     axes[1].set_xlabel(r"Privacy Budget ($\varepsilon$)")
     axes[1].set_ylabel("Diagnostic Performance")

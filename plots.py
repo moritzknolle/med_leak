@@ -127,7 +127,7 @@ def main(argv):
     ax.set_yticks(ticks)
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
-    #fig.legend(loc="upper right")
+    fig.legend(loc="upper right")
     plt.savefig(
         f"./figs/agg_{FLAGS.mia_method}_MIA_ROC_curves_{scale}.pdf", bbox_inches="tight"
     )
