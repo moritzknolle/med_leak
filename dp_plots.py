@@ -20,6 +20,7 @@ from src.privacy_utils.lira import (
     loss_logit_transform_multiclass,
     record_MIA_ROC_analysis,
 )
+from convenience_utils import get_data_root
 
 FONT_SIZE = 7
 plt.style.use("default")
@@ -46,25 +47,25 @@ flags.DEFINE_float(
 flags.DEFINE_float("ylim_lower", 0.75, "lower y-limit for test performance metric plot")
 
 PTB_LOG_DIRS = {
-    "eps1": "./logs/ptb-xl/dp/eps1",
+    "eps5": "./logs/ptb-xl/dp/eps5",
     "eps10": "./logs/ptb-xl/dp/eps10",
     "eps100": "./logs/ptb-xl/dp/eps100",
     "eps1000": "./logs/ptb-xl/dp/eps1000",
     "epsinf": "./logs/ptb-xl/dp/epsinf",
 }
+FITZ_LOG_DIRS = {
+    "eps5": "./logs/fitzpatrick/dp/eps5",
+    "eps10": "./logs/fitzpatrick/dp/eps10",
+    "eps100": "./logs/fitzpatrick/dp/eps100",
+    "eps1000": "./logs/fitzpatrick/dp/eps1000",
+    "epsinf": "./logs/fitzpatrick/dp/epsinf",
+}
 COLORS = {
-    "eps1": "#d8c7ea",
+    "eps5": "#d8c7ea",
     "eps10": "#BE93EC",
     "eps100": "#9063C1",
     "eps1000": "#643893",
     "epsinf": "#462666",
-}
-NOISE_MULTIPLIERS = {
-    "eps1": 14.901956181711261,
-    "eps10": 2.217857337107472,
-    "eps100": 0.6450520413560445,
-    "eps1000": 0.2787387586165937,
-    "epsinf": 0.00000001,
 }
 def compute_mu_uniform(
     steps: int, noise_multiplier: float, sample_rate: float
@@ -134,7 +135,7 @@ def calculate_dp_bound(logdir: Path):
         delta = 1/ train_size
     sample_rate = batch_size / train_size
     # for small epsilon we use the privacy profile to compute the AUC bound
-    if epsilon <= 15:
+    if epsilon <= 10:
         alphas = np.linspace(0, 1, 10_000)
         epsila = np.linspace(-10, 10, 5000)
         pprofile = get_privacy_profile(eps=epsila, sigma=noise_multiplier, p=sample_rate, steps=steps)
@@ -180,6 +181,8 @@ def get_perf_from_json(log_dir: Path, metric_name: str = "accuracy"):
 def get_label(model_name: str) -> str:
     if model_name == "eps1":
         return r"$\varepsilon=10^0$"
+    elif model_name == "eps5":
+        return r"$\varepsilon=5$"
     elif model_name == "eps10":
         return r"$\varepsilon=10^1$"
     elif model_name == "eps100":
@@ -199,9 +202,9 @@ def main(argv):
         img_size=[64, 64],
         csv_root=Path(FLAGS.csv_root),
         save_root=Path(FLAGS.save_root),
-        data_root=Path("/home/moritz/data/physionet.org/files/ptb-xl/1.0.3/"),
+        data_root=get_data_root(FLAGS.dataset_name),
     )
-    LOG_DIRS = PTB_LOG_DIRS if FLAGS.dataset_name == "ptb-xl" else 0
+    LOG_DIRS = PTB_LOG_DIRS if FLAGS.dataset_name == "ptb-xl" else FITZ_LOG_DIRS
     test_metric_name = (
         "_val_macro_auroc" if FLAGS.dataset_name == "ptb-xl" else "_val_auroc"
     )
@@ -272,7 +275,7 @@ def main(argv):
         capsize=2,
     )
     axes[1].set_xticks(range(len(LOG_DIRS)))
-    axes[1].set_xticklabels([r"$10^0$", r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
+    axes[1].set_xticklabels([5, r"$10^1$", r"$10^2$", r"$10^3$", r"$\infty$"], fontsize=6)
     #axes[1].set_xticklabels([])
     axes[1].set_xlabel(r"Privacy Budget ($\varepsilon$)")
     axes[1].set_ylabel("Diagnostic Performance")
